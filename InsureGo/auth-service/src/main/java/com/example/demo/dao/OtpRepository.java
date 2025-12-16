@@ -1,0 +1,13 @@
+package com.example.demo.dao;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.example.demo.bean.OTP;
+
+public interface OtpRepository extends JpaRepository<OTP, Long> {
+    Optional<OTP> findTopByIdentifierAndTypeAndIsUsedOrderByExpiryTimeDesc(
+        String identifier, OTP.OtpType type, boolean isUsed
+    );
+}

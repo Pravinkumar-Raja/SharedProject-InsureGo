@@ -1,0 +1,57 @@
+package com.example.demo.config;
+
+import com.example.demo.bean.User;
+import com.example.demo.dao.UserRepository;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@Configuration
+public class DataSeeder {
+
+    @Bean
+    CommandLineRunner initDatabase(UserRepository repo, PasswordEncoder passwordEncoder) {
+        return args -> {
+            // --- 1. SYSTEM ADMIN ---
+            createUser(repo, passwordEncoder, "Super Admin", "admin@insure.com", "9999999000", "ADMIN");
+
+            // --- 2. INSURANCE PROVIDERS (3 Companies) ---
+            createUser(repo, passwordEncoder, "LIC", "provider@lic.com", "9999999101", "PROVIDER");
+            createUser(repo, passwordEncoder, "Bajaj", "provider@bajaj.com", "9999999102", "PROVIDER");
+            createUser(repo, passwordEncoder, "Star", "provider@star.com", "9999999103", "PROVIDER");
+
+            // --- 3. DOCTORS (6 Specialists) ---
+            // FIXED: Using String array to avoid 'User constructor' errors
+            String[][] doctorData = {
+                {"Dr. Sarah Smith (Cardiology)", "sarah@hospital.com", "9999999201"},
+                {"Dr. Gregory House (Diagnostics)", "house@hospital.com", "9999999202"},
+                {"Dr. Meredith Grey (General Surgery)", "grey@hospital.com", "9999999203"},
+                {"Dr. Derek Shepherd (Neurology)", "derek@hospital.com", "9999999204"},
+                {"Dr. Strange (Surgeon)", "strange@hospital.com", "9999999205"},
+                {"Dr. John Watson (General)", "watson@hospital.com", "9999999206"}
+            };
+
+            for (String[] doc : doctorData) {
+                // doc[0]=Name, doc[1]=Email, doc[2]=Phone
+                createUser(repo, passwordEncoder, doc[0], doc[1], doc[2], "DOCTOR");
+            }
+        };
+    }
+
+    // --- HELPER FUNCTION TO CREATE USERS ---
+    private void createUser(UserRepository repo, PasswordEncoder encoder, String name, String email, String phone, String role) {
+        if (!repo.existsByEmail(email)) {
+            User user = new User();
+            user.setName(name);
+            user.setEmail(email);
+            user.setPhoneNumber(phone);
+            user.setPassword(encoder.encode("pass123")); // Default password is 'pass123'
+            user.setRole(role);
+            user.setEmailVerified(true);
+            user.setPhoneVerified(true);
+            repo.save(user);
+            System.out.println("✅ Created " + role + ": " + name + " (" + email + ")");
+        }
+    }
+}

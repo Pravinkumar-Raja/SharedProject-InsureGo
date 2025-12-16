@@ -1,0 +1,71 @@
+package com.example.demo.bean;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+@Entity
+@Table(name="appointment")
+public class Appointment {
+
+    public static final String STATUS_CONFIRMED = "CONFIRMED";
+    public static final String STATUS_CANCELLED = "CANCELLED";
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long appointmentId; // Matches service logic
+
+    private Long patientId;
+    private String patientName;
+    
+    private Long doctorID; // Service uses this for conflict checks
+    private String doctorName; // Frontend sends this
+    
+    private LocalDate appointmentDate; // Renamed from 'date' to match Service
+    private LocalTime appointmentTime; // Renamed from 'time' to match Service
+    
+    private String ailmentReason; // Renamed from 'reason'
+    private String ailmentType;
+    
+    private String status;
+
+    public Appointment() {}
+
+    // --- Getters and Setters ---
+
+    public Long getAppointmentId() { return appointmentId; }
+    public void setAppointmentId(Long appointmentId) { this.appointmentId = appointmentId; }
+
+    public Long getPatientId() { return patientId; }
+    public void setPatientId(Long patientId) { this.patientId = patientId; }
+
+    public String getPatientName() { return patientName; }
+    public void setPatientName(String patientName) { this.patientName = patientName; }
+
+    public Long getDoctorID() { return doctorID; }
+    public void setDoctorID(Long doctorID) { this.doctorID = doctorID; }
+
+    public String getDoctorName() { return doctorName; }
+    public void setDoctorName(String doctorName) { this.doctorName = doctorName; }
+
+    public LocalDate getAppointmentDate() { return appointmentDate; }
+    public void setAppointmentDate(LocalDate appointmentDate) { this.appointmentDate = appointmentDate; }
+
+    public LocalTime getAppointmentTime() { return appointmentTime; }
+    public void setAppointmentTime(LocalTime appointmentTime) { this.appointmentTime = appointmentTime; }
+
+    public String getAilmentReason() { return ailmentReason; }
+    public void setAilmentReason(String ailmentReason) { this.ailmentReason = ailmentReason; }
+
+    public String getAilmentType() { return ailmentType; }
+    public void setAilmentType(String ailmentType) { this.ailmentType = ailmentType; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    
+    // Helper to map frontend 'date'/'time'/'reason' if JSON keys differ
+    // (Optional: useful if frontend sends "date" but java expects "appointmentDate")
+    public void setDate(LocalDate date) { this.appointmentDate = date; }
+    public void setTime(LocalTime time) { this.appointmentTime = time; }
+    public void setReason(String reason) { this.ailmentReason = reason; }
+}

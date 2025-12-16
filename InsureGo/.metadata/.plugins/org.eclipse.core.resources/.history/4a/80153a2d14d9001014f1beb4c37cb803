@@ -1,0 +1,63 @@
+package com.example.demo.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
+
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // 1. ENABLE CORS HERE
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            
+            // 2. DISABLE CSRF (Common for REST APIs)
+            .csrf(csrf -> csrf.disable())
+            
+            // 3. DEFINE URL ACCESS
+            .authorizeHttpRequests(auth -> auth
+                // Allow Swagger UI (Optional)
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                
+                // Allow Dashboard Stats (The one failing currently)
+                .requestMatchers("/dashboard/**", "/api/dashboard/**").permitAll() 
+                
+                // Secure everything else
+                .anyRequest().authenticated()
+            );
+
+        return http.build();
+    }
+
+    // --- 👇 THIS IS THE CRITICAL PART FOR CORS 👇 ---
+    @Bean
+    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        
+        // Allow Frontend
+        config.setAllowedOrigins(List.of("http://localhost:5173")); 
+        
+        // Allow Common Methods
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // Allow All Headers (Authorization, Content-Type, etc.)
+        config.setAllowedHeaders(List.of("*"));
+        
+        // Allow Credentials (Cookies/Auth Tokens)
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config); // Apply to ALL endpoints
+        return source;
+    }
+}

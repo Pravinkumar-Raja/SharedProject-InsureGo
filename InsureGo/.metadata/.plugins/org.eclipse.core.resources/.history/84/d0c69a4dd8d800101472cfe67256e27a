@@ -1,0 +1,81 @@
+package com.example.demo.controller;
+
+import com.example.demo.bean.OTP;
+import com.example.demo.bean.User;
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.OtpRequest;
+import com.example.demo.dto.PhoneRequest; // <--- Import the new DTO
+import com.example.demo.service.AuthService;
+import com.example.demo.service.OtpService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+@RestController
+@RequestMapping("/auth")
+@CrossOrigin(origins = "http://localhost:5173")
+public class AuthController {
+
+    @Autowired private AuthService authService;
+    @Autowired private OtpService otpService;
+    
+    // Temporary storage to track verified numbers before final registration
+    private ConcurrentHashMap<String, Boolean> verificationCache = new ConcurrentHashMap<>();
+
+    // --- 1. Request OTP (UPDATED FIX) ---
+    @PostMapping("/register/request-phone-otp")
+    public ResponseEntity<String> requestPhone(@RequestBody PhoneRequest request) {
+        // extract string from DTO
+        String phoneNumber = request.getPhoneNumber();
+        
+        // Pass to service (Service handles the +91 logic)
+        otpService.generateAndSendOtp(phoneNumber, OTP.OtpType.PHONE);
+        
+        return ResponseEntity.ok("SMS sent successfully to " + phoneNumber);
+    }
+
+    // --- 2. Verify OTP ---
+    @PostMapping("/register/verify-phone-otp")
+    public ResponseEntity<String> verifyPhone(@RequestBody OtpRequest request) {
+        // Check OTP validity
+        boolean isValid = otpService.verifyOtp(
+            request.getIdentifier(), 
+            request.getCode(), 
+            OTP.OtpType.PHONE
+        );
+
+        if (isValid) {
+            // Mark this number as verified in our temporary cache
+            verificationCache.put(request.getIdentifier(), true);
+            return ResponseEntity.ok("Phone Verified Successfully");
+        }
+        return ResponseEntity.badRequest().body("Invalid or Expired OTP");
+    }
+
+    // --- 3. Final Registration ---
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        // Security Check: Did they verify their phone first?
+        if (!verificationCache.containsKey(user.getPhoneNumber())) {
+            return ResponseEntity.status(403).body("Access Denied: Please verify your phone number first.");
+        }
+        
+        // Save the user
+        User savedUser = authService.register(user);
+        
+        // Optional: Remove from cache to save memory
+        verificationCache.remove(user.getPhoneNumber());
+        
+        return ResponseEntity.ok(savedUser);
+    }
+
+    // --- 4. Login ---
+    @PostMapping("/login")
+    public ResponseEntity<String> login(@RequestBody LoginRequest request) {
+        // Returns JWT Token
+        String token = authService.login(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(token);
+    }
+}

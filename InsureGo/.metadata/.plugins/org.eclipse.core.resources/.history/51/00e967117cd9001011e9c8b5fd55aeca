@@ -1,0 +1,36 @@
+package com.example.demo.service;
+
+
+import com.example.demo.bean.Claim;
+import com.example.demo.repository.ClaimRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class ClaimService {
+
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    public Claim submitClaim(Claim claim) {
+        claim.setStatus("PENDING");
+        return claimRepository.save(claim);
+    }
+
+    public List<Claim> getClaimsByUserId(Long userId) {
+        return claimRepository.findByUserId(userId);
+    }
+
+    public Claim updateClaimStatus(Long id, String status) {
+        return claimRepository.findById(id).map(claim -> {
+            claim.setStatus(status);
+            return claimRepository.save(claim);
+        }).orElseThrow(() -> new RuntimeException("Claim not found"));
+    }
+    // *** FIX 2: NEW SERVICE METHOD ***
+    public List<Claim> getClaimsByStatus(String status) {
+        return claimRepository.findByStatus(status);
+    }
+}

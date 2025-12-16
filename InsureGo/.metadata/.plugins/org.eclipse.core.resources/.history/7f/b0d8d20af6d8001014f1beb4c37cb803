@@ -1,0 +1,64 @@
+package com.example.demo.service;
+
+import com.example.demo.dto.*;
+import com.example.demo.bean.*;
+import com.example.demo.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class AppointmentService {
+
+    @Autowired private AppointmentRepository appointmentRepository;
+    @Autowired private DoctorRepository doctorRepository;
+
+    public List<Doctor> getAvailableDoctors() {
+        return doctorRepository.findAll();
+    }
+
+    public Appointment bookAppointment(Appointment request, Long patientId) {
+        // 1. Check for Conflicts
+        Optional<Appointment> conflict = appointmentRepository.findByDoctorIDAndAppointmentDateAndAppointmentTime(
+                request.getDoctorID(), request.getAppointmentDate(), request.getAppointmentTime());
+
+        if (conflict.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Slot already booked.");
+        }
+
+        request.setPatientId(patientId);
+        request.setPatientName("Patient ID: " + patientId); 
+        request.setStatus(Appointment.STATUS_CONFIRMED);
+
+        return appointmentRepository.save(request);
+    }
+
+    public List<Appointment> getAppointmentsByPatient(Long patientId) {
+        return appointmentRepository.findByPatientId(patientId);
+    }
+
+    public Appointment reschedule(RescheduleRequest request) {
+        Appointment existing = appointmentRepository.findById(request.getAppointmentId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Appointment not found"));
+
+        // Check conflict for NEW time
+        Optional<Appointment> conflict = appointmentRepository.findByDoctorIDAndAppointmentDateAndAppointmentTime(
+                request.getDoctorID(), request.getAppointmentDate(), request.getAppointmentTime());
+
+        if (conflict.isPresent() && !conflict.get().getAppointmentId().equals(request.getAppointmentId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "New slot is already booked.");
+        }
+
+        existing.setDoctorID(request.getDoctorID());
+        existing.setAppointmentDate(request.getAppointmentDate());
+        existing.setAppointmentTime(request.getAppointmentTime());
+        existing.setAilmentType(request.getAilmentType());
+        existing.setAilmentReason(request.getAilmentReason());
+
+        return appointmentRepository.save(existing);
+    }
+}

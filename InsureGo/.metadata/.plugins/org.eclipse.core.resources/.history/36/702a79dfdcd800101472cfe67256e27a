@@ -1,0 +1,36 @@
+package com.example.demo.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+
+@Configuration
+public class CorsConfig {
+
+    @Bean
+    public CorsWebFilter corsWebFilter() {
+        CorsConfiguration corsConfig = new CorsConfiguration();
+        
+        // 1. Allow ANY frontend URL (localhost:5173, localhost:3000, etc.)
+        corsConfig.setAllowedOriginPatterns(Arrays.asList("*")); 
+        
+        // 2. Allow ALL HTTP methods (GET, POST, PUT, DELETE, OPTIONS)
+        corsConfig.addAllowedMethod("*");
+        
+        // 3. Allow ALL Headers (Authorization, Content-Type, etc.)
+        corsConfig.addAllowedHeader("*");
+        
+        // 4. Allow Credentials (Cookies/Auth tokens)
+        corsConfig.setAllowCredentials(true);
+        
+        // 5. Apply this rule to ALL paths (/**)
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", corsConfig);
+        
+        return new CorsWebFilter(source);
+    }
+}

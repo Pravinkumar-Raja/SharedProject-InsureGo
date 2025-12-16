@@ -1,0 +1,28 @@
+package com.example.demo.bean;
+
+import jakarta.persistence.*;
+
+@Entity
+	@Data
+	@Table(name="users")
+	public class User {
+	    @Id
+	    @GeneratedValue(strategy = GenerationType.IDENTITY)
+	    private Long id;
+	    
+	    private String name;
+	    
+	    @Column(unique = true, nullable = false)
+	    private String email;
+	    
+	    @Column(unique = true, nullable = false)
+	    private String phoneNumber;
+	    
+	    private String password;
+	    private String role; // PATIENT, DOCTOR, INSURER
+	    
+	    // Verification Flags
+	    private boolean isEmailVerified = false; 
+	    private boolean isPhoneVerified = false; 
+	}
+

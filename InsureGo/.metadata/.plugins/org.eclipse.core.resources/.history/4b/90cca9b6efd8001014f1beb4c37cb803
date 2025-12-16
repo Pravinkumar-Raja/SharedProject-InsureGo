@@ -1,0 +1,15 @@
+package com.example.demo.repository;
+
+import com.example.demo.bean.*;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
+
+public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
+    Optional<Appointment> findByDoctorIDAndAppointmentDateAndAppointmentTime(
+            Long doctorID, LocalDate date, LocalTime time);
+            
+    List<Appointment> findByPatientId(Long patientId);
+}

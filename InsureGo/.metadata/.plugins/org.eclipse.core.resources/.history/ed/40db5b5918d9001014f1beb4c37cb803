@@ -1,0 +1,95 @@
+package com.example.demo.controller;
+
+
+import com.example.demo.bean.Appointment;
+import com.example.demo.bean.Review;
+import com.example.demo.repository.AppointmentRepository;
+import com.example.demo.repository.ReviewRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*; // Imports @CrossOrigin, @RestController, etc.
+import org.springframework.web.client.RestTemplate;
+import java.util.*;
+
+@RestController
+@RequestMapping("/dashboard")
+public class DashboardController {
+
+    @Autowired
+    private AppointmentRepository appointmentRepo;
+
+    @Autowired
+    private RestTemplate restTemplate;
+    @Autowired
+    private ReviewRepository reviewRepo;
+
+    // --- SUBMIT REVIEW ---
+    @PostMapping("/review")
+    public Review submitReview(@RequestBody Review review) {
+        return reviewRepo.save(review);
+    }
+
+    // --- UPDATE: GET DOCTOR STATS (Include Real Reviews) ---
+    // Update your existing getDoctorStats method to fetch REAL reviews
+    @GetMapping("/doctor-stats/{doctorId}")
+    public Map<String, Object> getDoctorStats(@PathVariable Long doctorId) {
+        Map<String, Object> stats = new HashMap<>();
+        
+        // ... (Keep existing Appointment/Revenue logic) ...
+
+        // 4. FETCH REAL REVIEWS
+        List<Review> realReviews = reviewRepo.findByDoctorId(doctorId);
+        stats.put("reviews", realReviews); // Send real list to frontend
+
+        return stats;
+    }
+    @GetMapping("/doctor-stats/{doctorId}")
+    public Map<String, Object> getDoctorStats(@PathVariable Long doctorId) {
+        Map<String, Object> stats = new HashMap<>();
+
+        // 1. LOCAL DATA: Get Appointments
+        // (Ensure your AppointmentRepository has findByDoctorID method)
+        List<Appointment> appts = appointmentRepo.findByDoctorID(doctorId);
+        
+        // Safety check if appts is null
+        if (appts == null) appts = new ArrayList<>();
+
+        long completedAppts = appts.stream().filter(a -> "COMPLETED".equals(a.getStatus())).count();
+        stats.put("totalPatients", completedAppts);
+
+        // 2. REMOTE DATA: Call Claims Service
+        // Make sure this URL is correct for YOUR Claims Service port (e.g., 8082)
+        String claimsServiceUrl = "http://localhost:8082/claim/doctor-stats/" + doctorId; 
+        
+        try {
+            Map<String, Object> claimData = restTemplate.getForObject(claimsServiceUrl, Map.class);
+            if (claimData != null) {
+                stats.put("totalRevenue", claimData.get("revenue"));
+                stats.put("approvalRate", claimData.get("approvalRate"));
+            } else {
+                stats.put("totalRevenue", 0);
+                stats.put("approvalRate", 0);
+            }
+        } catch (Exception e) {
+            System.err.println("Claims Service Error: " + e.getMessage());
+            stats.put("totalRevenue", 0);
+            stats.put("approvalRate", 0);
+        }
+
+        // 3. GRAPH DATA (Mock)
+        List<Map<String, Object>> graphData = new ArrayList<>();
+        graphData.add(Map.of("name", "Jan", "visits", 12));
+        graphData.add(Map.of("name", "Feb", "visits", 19));
+        graphData.add(Map.of("name", "Mar", "visits", 8));
+        graphData.add(Map.of("name", "Apr", "visits", (int) completedAppts)); 
+        stats.put("graphData", graphData);
+
+        // 4. REVIEWS (Mock)
+        List<Map<String, String>> reviews = new ArrayList<>();
+        reviews.add(Map.of("patient", "Alice", "rating", "⭐⭐⭐⭐⭐", "comment", "Great experience!"));
+        reviews.add(Map.of("patient", "Bob", "rating", "⭐⭐⭐⭐", "comment", "Very professional."));
+        stats.put("reviews", reviews);
+
+        return stats;
+    }
+}

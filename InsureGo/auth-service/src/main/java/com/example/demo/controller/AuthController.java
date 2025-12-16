@@ -1,0 +1,132 @@
+package com.example.demo.controller;
+
+import com.example.demo.bean.OTP;
+import com.example.demo.bean.User;
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.OtpRequest;
+import com.example.demo.dto.PhoneRequest;
+import com.example.demo.dao.UserRepository; // <--- Needed for Login check
+import com.example.demo.service.AuthService;
+import com.example.demo.service.OtpService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder; // <--- Critical for Login
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+    @Autowired private AuthService authService;
+    @Autowired private OtpService otpService;
+    
+    // We inject these to handle Login/Password checks directly in Controller
+    @Autowired private UserRepository userRepository;
+    @Autowired private PasswordEncoder passwordEncoder; 
+
+    // Temporary storage to track verified numbers
+    private ConcurrentHashMap<String, Boolean> verificationCache = new ConcurrentHashMap<>();
+
+    // --- 1. Request OTP ---
+    @PostMapping("/register/request-phone-otp")
+    public ResponseEntity<String> requestPhone(@RequestBody PhoneRequest request) {
+        String phoneNumber = request.getPhoneNumber();
+        otpService.generateAndSendOtp(phoneNumber, OTP.OtpType.PHONE);
+        return ResponseEntity.ok("SMS sent successfully to " + phoneNumber);
+    }
+
+    // --- 2. Verify OTP ---
+    @PostMapping("/register/verify-phone-otp")
+    public ResponseEntity<String> verifyPhone(@RequestBody OtpRequest request) {
+        boolean isValid = otpService.verifyOtp(
+            request.getIdentifier(), 
+            request.getCode(), 
+            OTP.OtpType.PHONE
+        );
+
+        if (isValid) {
+            verificationCache.put(request.getIdentifier(), true);
+            return ResponseEntity.ok("Phone Verified Successfully");
+        }
+        return ResponseEntity.badRequest().body("Invalid or Expired OTP");
+    }
+
+ // --- 3. Final Registration (UPDATED) ---
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        // 1. Security Check: Phone Verify
+        if (!verificationCache.containsKey(user.getPhoneNumber())) {
+            return ResponseEntity.status(403).body("Access Denied: Please verify your phone number first.");
+        }
+        
+        // 2. Hash Password
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        
+        // 3. Set Role (FIXED)
+        // If the user didn't send a role, default to PATIENT. 
+        // Otherwise, accept "DOCTOR" or "PROVIDER"
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            user.setRole("PATIENT");
+        } else {
+            // Optional: You could validate that the role is valid here
+            user.setRole(user.getRole().toUpperCase());
+        }
+
+        // 4. Save to Database
+        User savedUser = userRepository.save(user);
+        
+        // 5. Cleanup
+        verificationCache.remove(user.getPhoneNumber());
+        
+        return ResponseEntity.ok(savedUser);
+    }
+ // --- 4. Login (FINAL FIXED VERSION FOR PROVIDER REDIRECTION) ---
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        String email = request.getEmail();
+        String password = request.getPassword();
+
+        // A. Find User
+        Optional<User> userOpt = userRepository.findByEmail(email);
+
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            
+            // B. Check Password Hash 
+            if (passwordEncoder.matches(password, user.getPassword())) {
+                
+                // C. Build Response Payload
+                Map<String, Object> response = new HashMap<>();
+                response.put("token", "dummy-jwt-token-" + user.getId());
+                response.put("userId", user.getId());
+                response.put("name", user.getName());
+                response.put("role", user.getRole());
+                
+                // === CRITICAL FIX: Conditionally add 'providerName' for Frontend ===
+                if ("PROVIDER".equals(user.getRole())) {
+                    // Since the database 'name' column now holds the company name (e.g., "LIC"),
+                    // we map it to the 'providerName' key for the frontend to save in localStorage.
+                    response.put("providerName", user.getName()); 
+                }
+                // ===================================================
+                
+                return ResponseEntity.ok(response);
+            }
+        }
+        
+        return ResponseEntity.status(401).body("Invalid Email or Password");
+    }
+ // --- 5. GET ALL DOCTORS (For Booking Dropdown) ---
+    @GetMapping("/doctors")
+    public List<User> getAllDoctors() {
+        // Returns all users who have the role "DOCTOR"
+        return userRepository.findByRole("DOCTOR");
+    }
+}

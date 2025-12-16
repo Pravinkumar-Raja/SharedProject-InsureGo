@@ -1,0 +1,14 @@
+package com.example.demo.repository;
+
+
+import com.example.demo.bean.Claim;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.time.LocalDate;
+import java.util.List;
+
+public interface ClaimRepository extends JpaRepository<Claim, Long> {
+    List<Claim> findByUserId(Long userId);
+    
+    // NEW: Check for Duplicate Claims (Same Policy, Same Amount, Same Date)
+    boolean existsByPolicyNoAndTotalBillAmountAndDateFiled(String policyNo, Double amount, LocalDate date);
+}

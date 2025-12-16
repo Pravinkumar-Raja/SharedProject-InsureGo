@@ -1,0 +1,40 @@
+package com.example.demo.controller;
+
+import com.example.demo.dto.*;
+import com.example.demo.bean.*;
+import com.example.demo.service.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/appointment") // Maps to /api/appointment/** via Gateway
+public class AppointmentController {
+
+    @Autowired private AppointmentService service;
+
+    @GetMapping("/doctors/available")
+    public List<Doctor> getDoctors() {
+        return service.getAvailableDoctors();
+    }
+
+    @PostMapping("/confirm")
+    public ResponseEntity<Appointment> book(@RequestBody Appointment appointment, 
+                                            @RequestHeader(value = "Authorization", required = false) String token) {
+        // In a real microservice, we verify token or get ID from Gateway.
+        // For testing purposes now:
+        Long patientId = 1L; 
+        return ResponseEntity.ok(service.bookAppointment(appointment, patientId));
+    }
+
+    @GetMapping("/patient/{patientId}")
+    public List<Appointment> getMyBookings(@PathVariable Long patientId) {
+        return service.getAppointmentsByPatient(patientId);
+    }
+
+    @PutMapping("/reschedule")
+    public ResponseEntity<Appointment> reschedule(@RequestBody RescheduleRequest request) {
+        return ResponseEntity.ok(service.reschedule(request));
+    }
+}

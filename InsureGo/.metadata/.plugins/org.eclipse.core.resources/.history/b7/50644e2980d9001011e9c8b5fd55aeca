@@ -1,0 +1,104 @@
+package com.example.demo.service;
+
+import com.example.demo.dto.*;
+import com.example.demo.bean.*;
+import com.example.demo.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class AppointmentService {
+
+    @Autowired private AppointmentRepository appointmentRepository;
+    @Autowired private DoctorRepository doctorRepository;
+    @Autowired
+    private RestTemplate restTemplate;
+    public List<Doctor> getAvailableDoctors() {
+        return doctorRepository.findAll();
+    }
+
+    public Appointment bookAppointment(Appointment appointment, Long patientId) {
+    	public Appointment bookAppointment(Appointment appointment, Long patientId) {
+            
+            // --- FIX D: CALL USER SERVICE TO GET NAME ---
+            String userName = "Patient ID: " + patientId; // Default fallback
+
+            try {
+                // Assume AUTH-SERVICE is the microservice name registered in Eureka
+                String url = "http://AUTH-SERVICE/user/name/" + patientId; 
+                
+                // *** FIX 2: Correctly call getForEntity with HashMap.class ***
+                // Using HashMap.class resolves the generic type issue and provides a concrete class.
+                ResponseEntity<HashMap> response = restTemplate.getForEntity(url, HashMap.class);
+                
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    // Now we can safely treat the body as a Map
+                    Map<?, ?> bodyMap = response.getBody(); 
+                    if (bodyMap.containsKey("name")) {
+                        // Check if the value is a String before casting
+                        Object nameValue = bodyMap.get("name");
+                        if (nameValue instanceof String) {
+                            userName = (String) nameValue;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Log the error but proceed with the default placeholder name
+                System.err.println("Could not fetch user name from AUTH-SERVICE: " + e.getMessage());
+            }
+            
+            appointment.setPatientName(userName); 
+            // ----------------------------------------------------
+
+            // ... existing logic (like insurance policy ID checks) ...
+
+            // Ensure Appointment object has policy ID set (from Controller fix)
+            if (appointment.getInsurancePolicyId() == null || appointment.getInsurancePolicyId().isEmpty()) {
+                 appointment.setInsurancePolicyId("SELF-PAY"); 
+            }
+
+            // Save the appointment
+            return appointmentRepository.save(appointment);
+        }
+    public List<Appointment> getAppointmentsByDoctor(Long doctorId) {
+        return appointmentRepository.findByDoctorID(doctorId);
+    }
+
+    public Appointment updateStatus(Long id, String status) {
+        Appointment appt = appointmentRepository.findById(id).orElseThrow();
+        appt.setStatus(status);
+        return appointmentRepository.save(appt);
+    }
+    public List<Appointment> getAppointmentsByPatient(Long patientId) {
+        return appointmentRepository.findByPatientId(patientId);
+    }
+
+    public Appointment reschedule(RescheduleRequest request) {
+        Appointment existing = appointmentRepository.findById(request.getAppointmentId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Appointment not found"));
+
+        // Check conflict for NEW time
+        Optional<Appointment> conflict = appointmentRepository.findByDoctorIDAndAppointmentDateAndAppointmentTime(
+                request.getDoctorID(), request.getAppointmentDate(), request.getAppointmentTime());
+
+        if (conflict.isPresent() && !conflict.get().getAppointmentId().equals(request.getAppointmentId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "New slot is already booked.");
+        }
+
+        existing.setDoctorID(request.getDoctorID());
+        existing.setAppointmentDate(request.getAppointmentDate());
+        existing.setAppointmentTime(request.getAppointmentTime());
+        existing.setAilmentType(request.getAilmentType());
+        existing.setAilmentReason(request.getAilmentReason());
+
+        return appointmentRepository.save(existing);
+    }
+}

@@ -1,0 +1,59 @@
+package com.example.demo.config;
+
+import com.example.demo.bean.User;
+import com.example.demo.dao.UserRepository;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@Configuration
+public class DataSeeder {
+
+    @Bean
+    CommandLineRunner initDatabase(UserRepository repo, PasswordEncoder passwordEncoder) {
+        return args -> {
+            // 1. Create ADMIN
+            if (!repo.existsByEmail("admin@insure.com")) {
+                User admin = new User();
+                admin.setName("Super Admin");
+                admin.setEmail("admin@insure.com");
+                admin.setPhoneNumber("9999999901");
+                admin.setPassword(passwordEncoder.encode("admin123"));
+                admin.setRole("ADMIN");
+                admin.setEmailVerified(true);
+                admin.setPhoneVerified(true);
+                repo.save(admin);
+                System.out.println("✅ Admin Account Created");
+            }
+
+            // 2. Create DOCTOR
+            if (!repo.existsByEmail("doctor@hospital.com")) {
+                User doc = new User();
+                doc.setName("Dr. John Smith");
+                doc.setEmail("doctor@hospital.com");
+                doc.setPhoneNumber("9999999902");
+                doc.setPassword(passwordEncoder.encode("doc123"));
+                doc.setRole("DOCTOR");
+                doc.setEmailVerified(true);
+                doc.setPhoneVerified(true);
+                repo.save(doc);
+                System.out.println("✅ Doctor Account Created");
+            }
+
+            // 3. Create PROVIDER
+            if (!repo.existsByEmail("provider@lic.com")) {
+                User prov = new User();
+                prov.setName("LIC Manager");
+                prov.setEmail("provider@lic.com");
+                prov.setPhoneNumber("9999999903");
+                prov.setPassword(passwordEncoder.encode("prov123"));
+                prov.setRole("PROVIDER");
+                prov.setEmailVerified(true);
+                prov.setPhoneVerified(true);
+                repo.save(prov);
+                System.out.println("✅ Provider Account Created");
+            }
+        };
+    }
+}

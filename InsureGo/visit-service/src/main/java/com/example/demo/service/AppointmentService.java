@@ -1,0 +1,121 @@
+package com.example.demo.service;
+
+import com.example.demo.dto.*;
+import com.example.demo.bean.*;
+import com.example.demo.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@Service
+public class AppointmentService {
+
+    @Autowired private AppointmentRepository appointmentRepository;
+    @Autowired private DoctorRepository doctorRepository;
+    @Autowired
+    private RestTemplate restTemplate;
+    public List<Doctor> getAvailableDoctors() {
+        return doctorRepository.findAll();
+    }
+ // *** UPDATED bookAppointment METHOD ***
+    public Appointment bookAppointment(Appointment appointment, Long patientId) {
+            
+        // --- FIX 1: PRIORITIZE NAME SENT FROM FRONTEND PAYLOAD ---
+        String userName = appointment.getPatientName(); // Read the name sent by Patient Dashboard
+        
+        // Only run service-to-service call if the name is NOT set or looks like a placeholder
+        if (userName == null || userName.isEmpty() || userName.startsWith("Patient ID:")) {
+            
+            String fallbackName = "Patient ID: " + patientId; 
+            userName = fallbackName; // Start with the placeholder as the current best guess
+
+            try {
+                // Assume AUTH-SERVICE is the microservice name registered in Eureka
+                String url = "http://AUTH-SERVICE/user/name/" + patientId; 
+                
+                // Service-to-service call fallback (Only if frontend fails)
+                ResponseEntity<HashMap> response = restTemplate.getForEntity(url, HashMap.class);
+                
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    Map<?, ?> bodyMap = response.getBody(); 
+                    if (bodyMap.containsKey("name")) {
+                        Object nameValue = bodyMap.get("name");
+                        if (nameValue instanceof String) {
+                            userName = (String) nameValue; // Success: use the fetched name
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Failure: Keep the fallbackName (Patient ID: 1)
+                System.err.println("Could not fetch user name from AUTH-SERVICE: " + e.getMessage());
+            }
+        }
+        // ----------------------------------------------------
+        
+        // Ensure the best available name is saved
+        appointment.setPatientName(userName); 
+
+        // Ensure Appointment object has policy ID set (safety check)
+        if (appointment.getInsurancePolicyId() == null || appointment.getInsurancePolicyId().isEmpty()) {
+             appointment.setInsurancePolicyId("SELF-PAY"); 
+        }
+
+        // Save the appointment
+        return appointmentRepository.save(appointment);
+    }
+    public List<Appointment> getAppointmentsByDoctor(Long doctorId) {
+        return appointmentRepository.findByDoctorID(doctorId);
+    }
+
+    public Appointment updateStatus(Long id, String status) {
+        Appointment appt = appointmentRepository.findById(id).orElseThrow();
+        appt.setStatus(status);
+        return appointmentRepository.save(appt);
+    }
+    public List<Appointment> getAppointmentsByPatient(Long patientId) {
+        return appointmentRepository.findByPatientId(patientId);
+    }
+    public Appointment updateAppointmentDetails(Appointment existingAppointment) {
+        
+        Long patientId = existingAppointment.getPatientId();
+        String currentName = existingAppointment.getPatientName();
+        
+        // Check if the current name is a placeholder that needs fixing
+        if (currentName == null ) {
+            
+            String fallbackName = "Patient ID: " + patientId;
+            currentName = fallbackName;
+            
+            try {
+                // Assume AUTH-SERVICE is the microservice name registered in Eureka
+                String url = "http://AUTH-SERVICE/user/name/" + patientId; 
+                ResponseEntity<HashMap> response = restTemplate.getForEntity(url, HashMap.class);
+                
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    Map<?, ?> bodyMap = response.getBody(); 
+                    if (bodyMap.containsKey("name")) {
+                        Object nameValue = bodyMap.get("name");
+                        if (nameValue instanceof String) {
+                            currentName = (String) nameValue; // Found the real name
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Could not fix placeholder name during update: " + e.getMessage());
+            }
+            
+            existingAppointment.setPatientName(currentName);
+        }
+        
+        // Save the updated appointment 
+        return appointmentRepository.save(existingAppointment);
+    }
+}

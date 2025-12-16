@@ -1,0 +1,52 @@
+package com.example.demo.controller;
+
+import com.example.demo.bean.Appointment;
+import com.example.demo.bean.Doctor;
+import com.example.demo.dto.RescheduleRequest;
+import com.example.demo.service.AppointmentService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/appointment") // The Gateway likely forwards /api/appointment here
+@CrossOrigin(origins = "http://localhost:5173") 
+public class AppointmentController {
+
+    @Autowired private AppointmentService service;
+
+    // 1. Get List of Doctors
+    @GetMapping("/doctors/available")
+    public List<Doctor> getDoctors() {
+        return service.getAvailableDoctors();
+    }
+
+    // 2. Book Appointment (Matches Frontend call to /api/appointment/book)
+    @PostMapping("/book")
+    public ResponseEntity<Appointment> book(@RequestBody Appointment appointment) {
+        // In real app, extract ID from Token. For now, use the one sent in body or default.
+        Long patientId = (appointment.getPatientId() != null) ? appointment.getPatientId() : 1L;
+        
+        // If frontend didn't send doctorID (only name), we might set a dummy one 
+        // or handle it in service. For now, we ensure basic validation passes.
+        if(appointment.getDoctorID() == null) {
+            appointment.setDoctorID(999L); // Dummy ID to pass conflict check if needed
+        }
+
+        return ResponseEntity.ok(service.bookAppointment(appointment, patientId));
+    }
+
+    // 3. Get My Appointments (Matches Frontend call to /api/appointment/user/{id})
+    @GetMapping("/user/{patientId}")
+    public List<Appointment> getMyBookings(@PathVariable Long patientId) {
+        return service.getAppointmentsByPatient(patientId);
+    }
+
+    // 4. Reschedule (Optional, for future use)
+    @PutMapping("/reschedule")
+    public ResponseEntity<Appointment> reschedule(@RequestBody RescheduleRequest request) {
+        return ResponseEntity.ok(service.reschedule(request));
+    }
+}

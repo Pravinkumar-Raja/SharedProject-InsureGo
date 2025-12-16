@@ -1,0 +1,43 @@
+package com.example.demo.bean;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+@Entity
+@Table(name="appointment")
+public class Appointment {
+
+    public static final String STATUS_CONFIRMED = "CONFIRMED";
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long appointmentId;
+
+    private Long patientId;
+    private String patientName;
+    
+    private Long doctorID; 
+    private String doctorName; 
+    
+    private LocalDate appointmentDate; 
+    private LocalTime appointmentTime; 
+    
+    private String ailmentReason; 
+    private String ailmentType;
+    
+    private String status;
+
+    // *** NEW FIELD TO FIX SQL ERROR ***
+    @Column(name = "insurance_policy_id") 
+    private String insurancePolicyId;
+
+    public Appointment() {}
+
+    // --- Getters and Setters ---
+
+    // ... (Your existing getters/setters) ...
+
+    public String getInsurancePolicyId() { return insurancePolicyId; }
+    public void setInsurancePolicyId(String insurancePolicyId) { this.insurancePolicyId = insurancePolicyId; }
+}

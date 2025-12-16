@@ -1,0 +1,77 @@
+package com.example.demo.controller;
+
+package com.example.claimsservice.controller;
+
+import com.example.claimsservice.bean.Claim;
+import com.example.claimsservice.repository.ClaimRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/claim")
+public class ClaimController {
+
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    // 1. PATIENT: Initiates the Claim (Step 1)
+    @PostMapping("/initiate")
+    public ResponseEntity<Claim> initiateClaim(@RequestBody Claim claim) {
+        claim.setStatus("OPEN"); // Waiting for doctor
+        claim.setInsurancePays(0.0);
+        claim.setUserPays(0.0);
+        claim.setTotalBillAmount(0.0);
+        claim.setTreatmentDescription("Pending Doctor Input");
+        return ResponseEntity.ok(claimRepository.save(claim));
+    }
+
+    // 2. DOCTOR: Adds Bill & Treatment by Policy ID (Step 2)
+    @PutMapping("/doctor-update/{policyNo}")
+    public ResponseEntity<?> addMedicalDetails(@PathVariable String policyNo, @RequestBody Claim doctorEntry) {
+        // Find the "OPEN" claim for this policy
+        Optional<Claim> existingClaim = claimRepository.findAll().stream()
+            .filter(c -> c.getPolicyNo().equals(policyNo) && c.getStatus().equals("OPEN"))
+            .findFirst();
+
+        if (existingClaim.isPresent()) {
+            Claim claim = existingClaim.get();
+            // Update details
+            claim.setTotalBillAmount(doctorEntry.getTotalBillAmount());
+            claim.setTreatmentDescription(doctorEntry.getTreatmentDescription());
+            claim.setStatus("PENDING_APPROVAL"); // Now ready for Insurance Provider
+            return ResponseEntity.ok(claimRepository.save(claim));
+        }
+        return ResponseEntity.status(404).body("No open claim found for this Policy ID");
+    }
+
+    // 3. PROVIDER: Approves/Rejects & Calculates Split (Step 3)
+    @PutMapping("/verdict/{id}")
+    public ResponseEntity<Claim> providerVerdict(@PathVariable Long id, @RequestBody String status) {
+        return claimRepository.findById(id).map(claim -> {
+            claim.setStatus(status);
+            
+            if (status.equals("APPROVED")) {
+                // Logic: Insurance pays 80%, User pays 20%
+                double total = claim.getTotalBillAmount();
+                claim.setInsurancePays(total * 0.80);
+                claim.setUserPays(total * 0.20);
+            } else {
+                // Rejected: User pays everything
+                claim.setInsurancePays(0.0);
+                claim.setUserPays(claim.getTotalBillAmount());
+            }
+            return ResponseEntity.ok(claimRepository.save(claim));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 4. GET ALL (For Provider/Admin View)
+    @GetMapping("/all")
+    public List<Claim> getAllClaims() { return claimRepository.findAll(); }
+    
+    // 5. GET USER CLAIMS
+    @GetMapping("/user/{userId}")
+    public List<Claim> getUserClaims(@PathVariable Long userId) { return claimRepository.findByUserId(userId); }
+}

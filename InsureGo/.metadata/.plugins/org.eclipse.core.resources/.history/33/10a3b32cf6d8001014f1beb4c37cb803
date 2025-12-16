@@ -1,0 +1,21 @@
+package com.example.demo.repository;
+
+import com.example.demo.bean.Appointment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
+    
+    // Logic: Find conflict based on Doctor + Date + Time
+    Optional<Appointment> findByDoctorIDAndAppointmentDateAndAppointmentTime(
+            Long doctorID, LocalDate appointmentDate, LocalTime appointmentTime);
+            
+    // Logic: Get history for a specific patient
+    List<Appointment> findByPatientId(Long patientId);
+}

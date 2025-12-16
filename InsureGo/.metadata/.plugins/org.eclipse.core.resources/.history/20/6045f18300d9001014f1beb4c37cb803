@@ -1,0 +1,43 @@
+package com.example.demo.controller;
+
+import com.example.demo.bean.Claim;
+import com.example.demo.repository.ClaimRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/claim")
+public class ClaimController {
+
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    // 1. Submit a New Claim
+    @PostMapping("/submit")
+    public ResponseEntity<Claim> submitClaim(@RequestBody Claim claim) {
+        claim.setStatus("PENDING"); // Default status
+        return ResponseEntity.ok(claimRepository.save(claim));
+    }
+
+    // 2. Get My Claims
+    @GetMapping("/user/{userId}")
+    public List<Claim> getUserClaims(@PathVariable Long userId) {
+        return claimRepository.findByUserId(userId);
+    }
+    
+    // 3. Approve/Reject (For Admin/Doctor later)
+    @PutMapping("/status/{id}")
+    public ResponseEntity<Claim> updateStatus(@PathVariable Long id, @RequestBody String status) {
+        return claimRepository.findById(id).map(claim -> {
+            claim.setStatus(status);
+            return ResponseEntity.ok(claimRepository.save(claim));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+    @GetMapping("/all")
+    public List<Claim> getAllClaims() {
+        return claimRepository.findAll();
+    }
+}

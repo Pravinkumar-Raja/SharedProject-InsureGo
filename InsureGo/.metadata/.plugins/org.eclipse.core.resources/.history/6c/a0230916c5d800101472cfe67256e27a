@@ -1,0 +1,52 @@
+package com.example.demo.controller;
+
+
+import com.example.demo.bean.*;
+import com.example.demo.service.*;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+    @Autowired private AuthService authService;
+    @Autowired private OtpService otpService;
+    
+    // Temporary storage to ensure steps are followed
+    private ConcurrentHashMap<String, Boolean> verificationCache = new ConcurrentHashMap<>();
+
+    @PostMapping("/register/request-phone-otp")
+    public ResponseEntity<String> requestPhone(@RequestBody String phone) {
+        otpService.generateAndSendOtp(phone, OTP.OtpType.PHONE);
+        return ResponseEntity.ok("SMS sent");
+    }
+
+    @PostMapping("/register/verify-phone-otp")
+    public ResponseEntity<String> verifyPhone(@RequestBody OtpRequest request) {
+        if (otpService.verifyOtp(request.getIdentifier(), request.getCode(), OTP.OtpType.PHONE)) {
+            verificationCache.put(request.getIdentifier(), true);
+            return ResponseEntity.ok("Phone Verified");
+        }
+        return ResponseEntity.badRequest().body("Invalid Code");
+    }
+    
+    // ... Implement similar endpoints for Email ...
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        // Enforce that verification happened
+        if (!verificationCache.containsKey(user.getPhoneNumber())) {
+            return ResponseEntity.status(403).body("Verify Phone First");
+        }
+        return ResponseEntity.ok(authService.register(user));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<String> login(@RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request.getEmail(), request.getPassword()));
+    }
+}
