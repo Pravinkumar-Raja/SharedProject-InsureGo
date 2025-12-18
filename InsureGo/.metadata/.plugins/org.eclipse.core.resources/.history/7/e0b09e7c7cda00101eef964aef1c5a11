@@ -1,0 +1,82 @@
+package com.example.demo.bean;
+
+import jakarta.persistence.*;
+import lombok.Data; // Assuming you use Lombok, else add Getters/Setters
+
+@Entity
+@Table(name = "insurance_plans")
+public class InsurancePlan {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String planName;
+    private String providerName; // e.g., LIC, Star
+    private double coverageAmount;
+    private double premium;
+    
+    @Column(length = 1000) // Allow longer text for description
+    private String benefits;
+
+    // Optional: Link to the Provider who created it
+    private String createdByProviderId;
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
+	public String getPlanName() {
+		return planName;
+	}
+
+	public void setPlanName(String planName) {
+		this.planName = planName;
+	}
+
+	public String getProviderName() {
+		return providerName;
+	}
+
+	public void setProviderName(String providerName) {
+		this.providerName = providerName;
+	}
+
+	public double getCoverageAmount() {
+		return coverageAmount;
+	}
+
+	public void setCoverageAmount(double coverageAmount) {
+		this.coverageAmount = coverageAmount;
+	}
+
+	public double getPremium() {
+		return premium;
+	}
+
+	public void setPremium(double premium) {
+		this.premium = premium;
+	}
+
+	public String getBenefits() {
+		return benefits;
+	}
+
+	public void setBenefits(String benefits) {
+		this.benefits = benefits;
+	}
+
+	public String getCreatedByProviderId() {
+		return createdByProviderId;
+	}
+
+	public void setCreatedByProviderId(String createdByProviderId) {
+		this.createdByProviderId = createdByProviderId;
+	} 
+    
+    
+}

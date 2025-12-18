@@ -1,487 +1,325 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Row, Col, Card, Badge, Spinner, Alert, Button, Modal, Table, Navbar, Form, Dropdown } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, FileText, Check, X, Clock, TrendingUp, Shield, LogOut, Plus, Search } from 'lucide-react'; 
+import { 
+    DollarSign, FileText, Check, Clock, Shield, LogOut, Plus, Search, 
+    Users, Edit, Trash2, TrendingUp, Activity, PieChart as PieIcon, 
+    Download, AlertCircle, BarChart2, FileCheck 
+} from 'lucide-react'; 
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+    PieChart, Pie, Cell, AreaChart, Area 
+} from 'recharts';
 import api from '../services/api'; 
 
-// --- CONFIGURATION ---
-const REVIEW_THRESHOLD = 500.00; // Claims above this amount require manual review
+const REVIEW_THRESHOLD = 0; 
 
-// --- CUSTOM SIDEBAR BUTTON COMPONENT (Defined OUTSIDE main component) ---
-// Note: This component must be defined outside or receive 'activeModule' as a prop
 const SidebarButton = ({ icon: Icon, label, active, onClick, count }) => (
-    <Button
-        variant={active ? 'primary' : 'light'}
-        onClick={onClick}
-        className={`text-start w-100 py-3 d-flex align-items-center justify-content-between gap-3 fw-bold ${active ? 'text-white' : 'text-secondary'}`}
-        style={{borderRadius: '10px'}}
-    >
-        <div className="d-flex align-items-center gap-3">
-            <Icon size={20} style={{color: active ? 'white' : 'var(--accent)'}}/>
-            {label}
-        </div>
-        {/* Note: Accessing activeModule directly is incorrect if this is outside, but using the 'active' prop is correct. */}
-        {count > 0 && (
-            <Badge bg="danger" className="ms-auto rounded-pill">{count}</Badge>
-        )}
-    </Button>
+    <Button variant={active ? 'primary' : 'light'} onClick={onClick} className={`text-start w-100 py-3 d-flex align-items-center justify-content-between gap-3 fw-bold ${active ? 'text-white' : 'text-secondary'}`} style={{borderRadius: '10px'}}><div className="d-flex align-items-center gap-3"><Icon size={20} style={{color: active ? 'white' : 'var(--accent)'}}/>{label}</div>{count > 0 && <Badge bg="danger" className="ms-auto rounded-pill">{count}</Badge>}</Button>
 );
 
+// Metric Card Component
+const MetricCard = ({ title, value, icon: Icon, color, subtext }) => (
+    <Card className="h-100 p-3 border-0 shadow-sm" style={{ borderLeft: `5px solid ${color}`, background: '#fff' }}>
+        <div className="d-flex justify-content-between align-items-start">
+            <div>
+                <p className="text-muted text-uppercase small fw-bold mb-1">{title}</p>
+                <h2 className="fw-bold mb-0" style={{color: '#1e293b'}}>{value}</h2>
+                {subtext && <p className="text-muted small mt-2 mb-0">{subtext}</p>}
+            </div>
+            <div className="p-3 rounded-circle" style={{background: `${color}20`}}>
+                <Icon size={24} color={color} />
+            </div>
+        </div>
+    </Card>
+);
 
 const ProviderDashboard = () => {
     const navigate = useNavigate();
+    const storedProviderName = localStorage.getItem('providerName') || "InsureGo Admin"; 
     
-    // CRITICAL: Retrieve Provider Name stored during login
-    const storedProviderName = localStorage.getItem('providerName'); 
-    
-    // --- STATE MANAGEMENT ---
     const [loading, setLoading] = useState(true);
-    const [metrics, setMetrics] = useState({ totalClaims: 0, claimsToday: 0 });
-    const [highValueClaims, setHighValueClaims] = useState([]);
     const [allClaimsHistory, setAllClaimsHistory] = useState([]); 
+    const [policyHolders, setPolicyHolders] = useState([]);
+    const [createdPlans, setCreatedPlans] = useState([]); 
     const [activeModule, setActiveModule] = useState('review'); 
     
-    // Policy Management State (P4)
-    const [showPolicyModal, setShowPolicyModal] = useState(false);
-    const [newPolicyForm, setNewPolicyForm] = useState({ 
-        policyName: '', 
-        coverageAmount: '', 
-        premium: '',
-        provider: storedProviderName || ''
+    // Analytics State
+    const [analyticsData, setAnalyticsData] = useState({ 
+        totalPayout: 0, approvalRate: 0, statusDistribution: [], timelineData: [],
+        totalClaims: 0, pending: 0, approved: 0, rejected: 0
     });
 
-    // Claim Action State (P3)
+    // Modals
+    const [showPolicyModal, setShowPolicyModal] = useState(false);
+    const [editingPlanId, setEditingPlanId] = useState(null); 
+    const [newPolicyForm, setNewPolicyForm] = useState({ policyName: '', coverageAmount: '', premium: '', benefits: '', provider: storedProviderName });
+    
+    // 🟢 UPDATED: Action Modal State
     const [showActionModal, setShowActionModal] = useState(false);
     const [selectedClaim, setSelectedClaim] = useState(null);
     const [actionNotes, setActionNotes] = useState('');
-    const [actionStatus, setActionStatus] = useState(''); // 'APPROVED' or 'REJECTED'
+    const [actionStatus, setActionStatus] = useState(''); 
 
-    // --- DATA LOADING ---
-    useEffect(() => {
-        if (!storedProviderName) { 
-            navigate('/login'); 
-            return; 
-        }
-        loadDashboardData();
-    }, [storedProviderName, navigate]);
+    useEffect(() => { if (!storedProviderName) { navigate('/login'); return; } loadDashboardData(); }, [storedProviderName]);
+
+    const bgStyle = { background: '#f3f4f6', minHeight: '100vh', paddingBottom: '2rem' };
+    const glassStyle = { background: '#ffffff', borderRadius: '16px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' };
 
     const loadDashboardData = async () => {
         setLoading(true);
         try {
-            // P1: Fetch Metrics
-            const metricsRes = await api.getProviderMetrics(storedProviderName); 
-            setMetrics(metricsRes.data);
+            const cleanProviderName = storedProviderName.trim();
+            const historyRes = await api.getAllProviderClaims(cleanProviderName); 
+            const claims = historyRes.data || []; 
+            claims.sort((a,b) => new Date(b.dateFiled) - new Date(a.dateFiled));
+            setAllClaimsHistory(claims);
+
+            // Fetch Policy Holders
+            let customers = []; 
+            try { 
+                const allPoliciesRes = await api.getAllPolicies(); 
+                customers = (allPoliciesRes.data || []).filter(p => (p.insuranceProvider || p.provider || "").trim().toUpperCase() === cleanProviderName.toUpperCase()); 
+                setPolicyHolders(customers); 
+            } catch (e) {}
+
+            // Fetch Plans
+            try { 
+                const plansRes = await api.getMarketplacePlans(); 
+                const myPlans = (plansRes.data || []).filter(p => (p.provider || p.insuranceProvider || "").trim().toUpperCase() === cleanProviderName.toUpperCase()); 
+                setCreatedPlans(myPlans); 
+            } catch(e) {}
+
+            // Analytics Math
+            const approved = claims.filter(c => c.status === 'APPROVED');
+            const rejected = claims.filter(c => c.status === 'REJECTED');
+            const pending = claims.filter(c => ['OPEN', 'PENDING', 'PENDING_APPROVAL'].includes(c.status));
             
-            // P2: Fetch High-Value Claims
-            const claimsRes = await api.getHighValueClaims(storedProviderName);
-            setHighValueClaims(claimsRes.data);
+            const totalPayout = approved.reduce((sum, c) => sum + (parseFloat(c.totalBillAmount || c.insurancePays) || 0), 0);
+            
+            const dist = [
+                { name: 'Approved', value: approved.length, color: '#10b981' },
+                { name: 'Rejected', value: rejected.length, color: '#ef4444' },
+                { name: 'Pending', value: pending.length, color: '#f59e0b' }
+            ].filter(d => d.value > 0);
 
-            // P5: Fetch ALL Claims History
-            const historyRes = await api.getAllProviderClaims(storedProviderName);
-            setAllClaimsHistory(historyRes.data);
+            const volumeMap = {};
+            claims.forEach(c => {
+                const d = c.dateFiled || 'Unknown';
+                if(!volumeMap[d]) volumeMap[d] = 0;
+                volumeMap[d]++;
+            });
+            const timelineData = Object.keys(volumeMap).sort().slice(-7).map(date => ({ name: date, claims: volumeMap[date] }));
 
-        } catch (e) { 
-            console.error("Failed to load provider dashboard data:", e); 
-            alert("Error loading data. Check Claim Service connection.");
-        }
+            setAnalyticsData({
+                totalPayout, approvalRate: claims.length > 0 ? Math.round((approved.length / claims.length) * 100) : 0,
+                statusDistribution: dist, timelineData,
+                totalClaims: claims.length, pending: pending.length, approved: approved.length, rejected: rejected.length
+            });
+
+        } catch (e) { console.error("Load failed", e); }
         setLoading(false);
     };
 
-    // --- LOGIC: POLICY MANAGEMENT (P4) ---
-    const handlePolicySubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const payload = {
-                ...newPolicyForm,
-                coverageAmount: parseFloat(newPolicyForm.coverageAmount),
-                premium: parseFloat(newPolicyForm.premium)
-            };
-            
-            await api.addPolicy(payload); 
-            
-            alert(`New Policy '${newPolicyForm.policyName}' added successfully!`);
-            
-            setNewPolicyForm({ 
-                policyName: '', 
-                coverageAmount: '', 
-                premium: '',
-                provider: storedProviderName || ''
-            });
-            setShowPolicyModal(false);
-            
-        } catch (e) {
-            console.error("Failed to add policy:", e);
-            alert("Failed to add policy. Check Policy Service connection.");
-        }
-    };
+    const derivedHighValueClaims = allClaimsHistory.filter(c => { 
+        const status = (c.status || '').toUpperCase(); 
+        return ['OPEN', 'PENDING', 'PENDING_APPROVAL', 'SUBMITTED'].includes(status); 
+    });
+
+    const handleLogout = () => { localStorage.clear(); navigate('/login'); };
     
-    // --- LOGIC: CLAIM ACTION (P3) ---
-    const openActionModal = (claim, status) => {
+    // Policy Management
+    const resetPolicyForm = () => { setEditingPlanId(null); setNewPolicyForm({ policyName: '', coverageAmount: '', premium: '', benefits: '', provider: storedProviderName }); setShowPolicyModal(false); };
+    const handlePolicySubmit = async (e) => { 
+        e.preventDefault(); 
+        try { 
+            const payload = { ...newPolicyForm, coverageAmount: parseFloat(newPolicyForm.coverageAmount), premium: parseFloat(newPolicyForm.premium) }; 
+            if (editingPlanId) { await api.updateMarketplacePlan(editingPlanId, payload); alert(`Plan Updated!`); } 
+            else { await api.addMarketplacePlan(payload); alert(`Plan Created!`); } 
+            loadDashboardData(); resetPolicyForm(); 
+        } catch (e) { alert("Failed."); } 
+    };
+    const handleEditPlan = (plan) => { setEditingPlanId(plan.id); setNewPolicyForm({ policyName: plan.policyName, coverageAmount: plan.coverageAmount, premium: plan.premium, benefits: plan.benefits, provider: storedProviderName }); setShowPolicyModal(true); };
+    const handleDeletePlan = async (id) => { if(!window.confirm("Delete?")) return; try { await api.deleteMarketplacePlan(id); loadDashboardData(); } catch (e) { alert("Failed."); } };
+
+    // 🟢 Claim Action Submit
+    const handleSubmitClaimAction = async () => { 
+        try { 
+            await api.processClaimAction(selectedClaim.claimId, actionStatus, { notes: actionNotes, reviewedBy: storedProviderName }); 
+            alert(`Claim ${actionStatus}!`); setShowActionModal(false); loadDashboardData(); 
+        } catch (e) { alert("Processing failed."); } 
+    };
+
+    // 🟢 OPEN DOCUMENT MODAL
+    const openReviewModal = (claim) => {
         setSelectedClaim(claim);
-        setActionStatus(status);
+        setActionStatus(''); // Reset status
         setActionNotes('');
         setShowActionModal(true);
     };
 
-    const handleSubmitClaimAction = async () => {
-        if (!actionNotes) {
-            alert("Please provide notes/reasoning before finalizing the action.");
-            return;
-        }
-        
-        try {
-            await api.processClaimAction(
-                selectedClaim.claimId, 
-                actionStatus, 
-                { 
-                    notes: actionNotes,
-                    reviewedBy: storedProviderName 
-                }
-            );
-            
-            alert(`Claim ${selectedClaim.claimId} ${actionStatus} successfully!`);
-            setShowActionModal(false);
-            loadDashboardData(); 
-
-        } catch (e) {
-            console.error("Failed to process claim action:", e);
-            alert("Failed to process claim action. Check Claim Service connection.");
-        }
-    };
-
-    const handleLogout = () => { 
-        localStorage.clear(); 
-        navigate('/login'); 
-    };
-
-    // =========================================================================
-    // --- RENDERER HELPER FUNCTIONS (Placed here to ensure scope) ---
-    // =========================================================================
-
-    const renderHeaderMetrics = () => (
-        <Row className="mb-4">
-            {/* Metric 1: Total Claims Overall */}
-            <Col md={4} className="mb-3">
-                <Card className="shadow-sm h-100 border-0" style={{borderRadius: '12px', borderBottom: '4px solid var(--primary)'}}>
-                    <Card.Body>
-                        <DollarSign size={24} className="text-primary mb-2"/>
-                        <p className="text-muted mb-0 small text-uppercase">Total Claims (Overall)</p>
-                        <h3 className="fw-bold">{metrics.totalClaims}</h3>
-                    </Card.Body>
-                </Card>
-            </Col>
-            
-            {/* Metric 2: Claims Today */}
-            <Col md={4} className="mb-3">
-                <Card className="shadow-sm h-100 border-0" style={{borderRadius: '12px', borderBottom: '4px solid var(--success)'}}>
-                    <Card.Body>
-                        <Clock size={24} className="text-success mb-2"/>
-                        <p className="text-muted mb-0 small text-uppercase">Claims Filed Today</p>
-                        <h3 className="fw-bold">{metrics.claimsToday}</h3>
-                    </Card.Body>
-                </Card>
-            </Col>
-
-            {/* Metric 3: Claims Needing Review */}
-            <Col md={4} className="mb-3">
-                <Card className="shadow-sm h-100 border-0" style={{borderRadius: '12px', borderBottom: '4px solid var(--warning)'}}>
-                    <Card.Body>
-                        <FileText size={24} className="text-warning mb-2"/>
-                        <p className="text-muted mb-0 small text-uppercase">Awaiting Manual Review</p>
-                        <h3 className="fw-bold text-danger">{highValueClaims.length}</h3>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
-    );
-
-    const renderClaimReview = () => (
-        <>
-            <h4 className="mb-4 text-primary fw-bold">Claims Requiring Manual Review ( &gt; ${REVIEW_THRESHOLD.toFixed(2)} )</h4>
-            
-            {highValueClaims.length === 0 ? (
-                <Alert variant="success">🎉 No high-value claims currently require manual verification.</Alert>
-            ) : (
-                <Table hover responsive className="bg-white shadow-sm" style={{borderRadius: '12px', overflow: 'hidden'}}>
-                    <thead className="bg-light">
-                        <tr>
-                            <th>Claim ID</th>
-                            <th>Patient ID</th>
-                            <th>Bill Amount</th>
-                            <th>Doctor ID</th>
-                            <th>Date Filed</th>
-                            <th>Status</th>
-                            <th className="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {highValueClaims.map(c => (
-                            <tr key={c.claimId}>
-                                <td>{c.claimId}</td>
-                                <td>{c.userId}</td>
-                                <td className="fw-bold text-danger">${c.totalBillAmount ? c.totalBillAmount.toFixed(2) : 'N/A'}</td>
-                                <td>{c.doctorID}</td>
-                                <td>{c.dateFiled}</td>
-                                <td><Badge bg="warning">OPEN</Badge></td>
-                                <td className="text-center">
-                                    <Dropdown>
-                                        <Dropdown.Toggle variant="secondary" size="sm" id={`dropdown-claim-${c.claimId}`}>
-                                            Action
-                                        </Dropdown.Toggle>
-                                        <Dropdown.Menu>
-                                            <Dropdown.Item onClick={() => openActionModal(c, 'APPROVED')} className="text-success">
-                                                <Check size={16} className="me-1"/> Approve
-                                            </Dropdown.Item>
-                                            <Dropdown.Item onClick={() => openActionModal(c, 'REJECTED')} className="text-danger">
-                                                <X size={16} className="me-1"/> Reject
-                                            </Dropdown.Item>
-                                        </Dropdown.Menu>
-                                    </Dropdown>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </Table>
-            )}
-        </>
-    );
-
-    const renderClaimsHistory = () => (
-        <>
-            <h4 className="mb-4 text-primary fw-bold">Full Claims History and Audit Trail</h4>
-            <Alert variant="info">
-                Showing **{allClaimsHistory.length}** total claims processed for {storedProviderName}.
-            </Alert>
-
-            <Table hover responsive className="bg-white shadow-sm" style={{borderRadius: '12px', overflow: 'hidden'}}>
-                <thead className="bg-light">
-                    <tr>
-                        <th>Claim ID</th>
-                        <th>Patient ID</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Insurance Pays</th>
-                        <th>Date Filed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {allClaimsHistory
-                        .sort((a, b) => new Date(b.dateFiled) - new Date(a.dateFiled))
-                        .map(c => (
-                        <tr key={c.claimId}>
-                            <td>{c.claimId}</td>
-                            <td>{c.userId}</td>
-                            <td className="fw-bold">${c.totalBillAmount ? c.totalBillAmount.toFixed(2) : 'N/A'}</td>
-                            <td>
-                                <Badge bg={
-                                    c.status === 'APPROVED' ? 'success' : 
-                                    c.status === 'REJECTED' ? 'danger' : 
-                                    'warning'
-                                }>
-                                    {c.status}
-                                </Badge>
-                            </td>
-                            <td>${c.insurancePays ? c.insurancePays.toFixed(2) : '0.00'}</td>
-                            <td>{c.dateFiled}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </Table>
-        </>
-    );
-
-
-    const renderPolicyManagement = () => (
-        <>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h4 className="text-primary fw-bold">Policy & Plan Management</h4>
-                <Button variant="success" onClick={() => setShowPolicyModal(true)}>
-                    <Plus size={20} className="me-1"/> Add New Policy
-                </Button>
-            </div>
-            <Alert variant="info">
-                This module handles adding new policy plans (e.g., Bronze, Gold, specific product lines) that patients can subscribe to.
-            </Alert>
-            <h5 className="mt-4">Current Plans for {storedProviderName}</h5>
-            <Table hover responsive className="bg-white shadow-sm">
-                <thead>
-                    <tr>
-                        <th>Policy Name</th>
-                        <th>Coverage</th>
-                        <th>Premium</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Premium Health Plan</td>
-                        <td>$1,000,000</td>
-                        <td>$500/month</td>
-                        <td><Button variant="outline-primary" size="sm">Edit</Button></td>
-                    </tr>
-                    <tr>
-                        <td colSpan="4" className="text-center text-muted">... list more policies from API ...</td>
-                    </tr>
-                </tbody>
-            </Table>
-        </>
+    const renderAnalytics = () => (
+        <div className="animate__animated animate__fadeIn">
+            <h3 className="fw-bold text-dark mb-4">Dashboard Overview</h3>
+            <Row className="g-4 mb-4">
+                <Col md={3}><MetricCard title="Total Payout" value={`$${analyticsData.totalPayout.toLocaleString()}`} icon={DollarSign} color="#10b981" subtext="Disbursed this month" /></Col>
+                <Col md={3}><MetricCard title="Pending Actions" value={analyticsData.pending} icon={AlertCircle} color="#f59e0b" subtext="Requires attention" /></Col>
+                <Col md={3}><MetricCard title="Claims Processed" value={analyticsData.totalClaims} icon={FileText} color="#3b82f6" subtext={`${analyticsData.approved} Approved / ${analyticsData.rejected} Rejected`} /></Col>
+                <Col md={3}><MetricCard title="Approval Rate" value={`${analyticsData.approvalRate}%`} icon={Activity} color="#8b5cf6" subtext="Efficiency Metric" /></Col>
+            </Row>
+            <Row className="g-4">
+                <Col lg={8}>
+                    <Card style={{borderRadius: '16px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} className="p-4 h-100 bg-white">
+                        <h5 className="fw-bold mb-0">Claim Volume Trends</h5>
+                        <div style={{ height: '350px', width: '100%' }}>
+                            <ResponsiveContainer>
+                                <AreaChart data={analyticsData.timelineData}>
+                                    <defs><linearGradient id="colorClaims" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Area type="monotone" dataKey="claims" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorClaims)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </Card>
+                </Col>
+                <Col lg={4}>
+                    <Card style={{borderRadius: '16px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} className="p-4 h-100 bg-white">
+                        <h5 className="fw-bold mb-4">Claim Status</h5>
+                        <div style={{ height: '300px', width: '100%' }}>
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie data={analyticsData.statusDistribution} innerRadius={60} outerRadius={80} dataKey="value">
+                                        {analyticsData.statusDistribution.map((e,i)=><Cell key={i} fill={e.color}/>)}
+                                    </Pie>
+                                    <Tooltip /><Legend verticalAlign="bottom" height={36} iconType="circle"/>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </Card>
+                </Col>
+            </Row>
+        </div>
     );
 
     const renderContent = () => {
-        if (loading) return <div className="text-center mt-5"><Spinner animation="border" variant="primary" /> <p className="mt-2">Loading Dashboard Data...</p></div>;
-        
+        if (loading) return <div className="text-center mt-5"><Spinner animation="border" /></div>;
         switch (activeModule) {
-            case 'review':
-                return renderClaimReview();
-            case 'policies':
-                return renderPolicyManagement();
-            case 'search': 
-                return renderClaimsHistory();
-            default:
-                return renderClaimReview();
+            case 'review': return (
+                <>
+                <h4 className="mb-4 text-primary fw-bold">Claims Queue</h4>
+                {derivedHighValueClaims.length === 0 ? <Alert variant="success">No pending claims.</Alert> : (
+                <Table hover responsive className="bg-white rounded shadow-sm">
+                    <thead className="bg-light"><tr><th>ID</th><th>Patient</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>{derivedHighValueClaims.map(c => (
+                        <tr key={c.claimId}><td>{c.claimId}</td><td>{c.patientName}</td><td className="fw-bold">${c.totalBillAmount}</td><td><Badge bg="warning">{c.status}</Badge></td>
+                        <td><Button size="sm" variant="outline-primary" onClick={() => openReviewModal(c)}>Review Details</Button></td></tr>
+                    ))}</tbody>
+                </Table>
+                )}
+                </>
+            );
+            case 'holders': return ( <Table hover className="bg-white rounded"><thead><tr><th>Patient</th><th>Status</th></tr></thead><tbody>{policyHolders.map(p=><tr key={p.id}><td>{p.patientName}</td><td><Badge bg="success">ACTIVE</Badge></td></tr>)}</tbody></Table> ); 
+            case 'policies': return (
+                <>
+                <div className="d-flex justify-content-between align-items-center mb-4"><h4 className="text-primary fw-bold">Marketplace Plans</h4><Button variant="success" onClick={() => { resetPolicyForm(); setShowPolicyModal(true); }}><Plus size={20}/> Add New Plan</Button></div><Table hover responsive className="bg-white shadow-sm"><thead><tr><th>Name</th><th>Coverage</th><th>Premium</th><th>Action</th></tr></thead><tbody>{createdPlans.map((plan, i) => (<tr key={i}><td>{plan.policyName}</td><td>${plan.coverageAmount?.toLocaleString()}</td><td className="text-success fw-bold">${plan.premium}</td><td><Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleEditPlan(plan)}><Edit size={16}/></Button><Button variant="outline-danger" size="sm" onClick={() => handleDeletePlan(plan.id)}><Trash2 size={16}/></Button></td></tr>))}</tbody></Table>
+                </>
+            );
+            case 'analytics': return renderAnalytics();
+            case 'search': return (
+                <Table hover responsive className="bg-white rounded">
+                    <thead><tr><th>ID</th><th>Patient</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+                    <tbody>{allClaimsHistory.map(c => (<tr key={c.claimId}><td>{c.claimId}</td><td>{c.patientName}</td><td className="fw-bold">${c.totalBillAmount}</td><td><Badge bg={c.status==='APPROVED'?'success': c.status==='REJECTED'?'danger':'warning'}>{c.status}</Badge></td><td>{c.dateFiled}</td></tr>))}</tbody>
+                </Table>
+            );
+            default: return <div>Select a module</div>;
         }
     };
 
-    // --- MAIN RENDER ---
     return (
-        <>
-            <Navbar className="shadow-sm px-4 justify-content-between" style={{background: 'var(--primary)'}}>
-                <Navbar.Brand className="text-white fw-bold">
-                    <Shield size={24} className="me-2" style={{color: 'var(--accent)'}}/>
-                    {storedProviderName} Portal
-                </Navbar.Brand>
-                <div className="d-flex gap-3 align-items-center">
-                    <span className="text-white-50">Hello, {storedProviderName}</span>
-                    <Button size="sm" variant="outline-light" onClick={handleLogout}>
-                        <LogOut size={16} className="me-1"/> Logout
-                    </Button>
-                </div>
+        <div style={bgStyle}>
+            <Navbar className="px-4 bg-white border-bottom shadow-sm justify-content-between">
+                <Navbar.Brand className="fw-bold text-primary"><Shield size={24} className="me-2"/>Provider Console</Navbar.Brand>
+                <div className="d-flex align-items-center gap-3"><span>{storedProviderName}</span><Button size="sm" variant="outline-dark" onClick={handleLogout}><LogOut size={16}/> Logout</Button></div>
             </Navbar>
-
-            <Container fluid className="py-4" style={{minHeight: 'calc(100vh - 56px)'}}>
-                {renderHeaderMetrics()} {/* P1: Metrics Cards - This call is now safe. */}
-
+            <Container fluid className="py-4">
                 <Row>
-                    {/* --- SIDEBAR --- */}
-                    <Col lg={3}>
-                        <Card className="shadow-lg border-0" style={{borderRadius: '16px'}}>
-                            <Card.Header className="fw-bold text-center border-0 py-3" style={{background: 'var(--bg-light)'}}>
-                                Provider Tasks
-                            </Card.Header>
-                            <div className="d-grid gap-2 p-3">
-                                <SidebarButton 
-                                    icon={FileText} 
-                                    label={`Claims Review (${highValueClaims.length})`}
-                                    active={activeModule === 'review'}
-                                    onClick={() => setActiveModule('review')}
-                                    count={highValueClaims.length} 
-                                />
-                                <SidebarButton 
-                                    icon={Shield} 
-                                    label="Policy Management" 
-                                    active={activeModule === 'policies'}
-                                    onClick={() => setActiveModule('policies')}
-                                />
-                                <SidebarButton 
-                                    icon={Search} 
-                                    label="Claims History/Audit" 
-                                    active={activeModule === 'search'}
-                                    onClick={() => setActiveModule('search')}
-                                />
-                            </div>
-                        </Card>
-                    </Col>
-
-                    {/* --- MAIN CONTENT AREA --- */}
-                    <Col lg={9}>
-                        <Card className="shadow-lg border-0 p-4" style={{borderRadius: '16px'}}>
-                            <Card.Body>
-                                {renderContent()}
-                            </Card.Body>
-                        </Card>
-                    </Col>
+                    <Col lg={3}><Card className="border-0 shadow-sm p-3" style={{...glassStyle, height: '85vh'}}>
+                        <div className="text-muted small fw-bold mb-3 px-3">MENU</div>
+                        <SidebarButton icon={PieIcon} label="Analytics" active={activeModule==='analytics'} onClick={()=>setActiveModule('analytics')}/>
+                        <SidebarButton icon={FileText} label="Review Queue" active={activeModule==='review'} onClick={()=>setActiveModule('review')} count={derivedHighValueClaims.length}/>
+                        <SidebarButton icon={Shield} label="Plan Manager" active={activeModule==='policies'} onClick={()=>setActiveModule('policies')}/>
+                        <SidebarButton icon={Users} label="Policy Holders" active={activeModule==='holders'} onClick={()=>setActiveModule('holders')}/>
+                        <SidebarButton icon={Search} label="Search History" active={activeModule==='search'} onClick={()=>setActiveModule('search')}/>
+                    </Card></Col>
+                    <Col lg={9}><Card className="border-0 p-4" style={glassStyle}><Card.Body>{renderContent()}</Card.Body></Card></Col>
                 </Row>
             </Container>
-
-            {/* --- MODAL 1: CLAIM ACTION (Approve/Reject) (P3) --- */}
-            <Modal show={showActionModal} onHide={() => setShowActionModal(false)} centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>{actionStatus} Claim {selectedClaim?.claimId}</Modal.Title>
+            
+            {/* 🟢 NEW: Detailed Claim Review Modal (Acts as the Document Viewer) */}
+            <Modal show={showActionModal} onHide={() => setShowActionModal(false)} size="lg" centered>
+                <Modal.Header closeButton style={{background: '#f8f9fa'}}>
+                    <Modal.Title className="fw-bold text-primary"><FileCheck size={24} className="me-2"/>Claim Review Document</Modal.Title>
                 </Modal.Header>
-                <Modal.Body>
-                    <Alert variant={actionStatus === 'APPROVED' ? 'success' : 'danger'}>
-                        Finalizing Claim **{selectedClaim?.claimId}** for **${selectedClaim?.totalBillAmount?.toFixed(2) || 'N/A'}**.
-                    </Alert>
+                <Modal.Body className="p-4">
+                    {selectedClaim && (
+                        <div className="mb-4 p-3 bg-light rounded border">
+                            <Row className="mb-2">
+                                <Col sm={4} className="text-muted small fw-bold text-uppercase">Patient</Col>
+                                <Col sm={8} className="fw-bold">{selectedClaim.patientName}</Col>
+                            </Row>
+                            <Row className="mb-2">
+                                <Col sm={4} className="text-muted small fw-bold text-uppercase">Policy No</Col>
+                                <Col sm={8}>{selectedClaim.policyNo || selectedClaim.policyNumber}</Col>
+                            </Row>
+                            <Row className="mb-2">
+                                <Col sm={4} className="text-muted small fw-bold text-uppercase">Doctor</Col>
+                                <Col sm={8}>{selectedClaim.doctorName || "N/A"}</Col>
+                            </Row>
+                            <hr/>
+                            <Row className="mb-2">
+                                <Col sm={4} className="text-muted small fw-bold text-uppercase">Diagnosis</Col>
+                                <Col sm={8}>{selectedClaim.diagnosisCode || "N/A"}</Col>
+                            </Row>
+                            <Row className="mb-2">
+                                <Col sm={4} className="text-muted small fw-bold text-uppercase">Treatment</Col>
+                                <Col sm={8}>{selectedClaim.treatmentDescription || "General Care"}</Col>
+                            </Row>
+                            <hr/>
+                            <Row className="align-items-center">
+                                <Col sm={4} className="text-muted small fw-bold text-uppercase">Total Bill Amount</Col>
+                                <Col sm={8} className="text-danger fs-4 fw-bold">${selectedClaim.totalBillAmount?.toLocaleString()}</Col>
+                            </Row>
+                        </div>
+                    )}
                     
-                    <h6 className="fw-bold">Claim Details Verified:</h6>
-                    <ul className="small text-muted mb-3">
-                        <li>Patient ID: {selectedClaim?.userId}</li>
-                        <li>Doctor ID: {selectedClaim?.doctorID} (Verify legitimacy)</li>
-                        <li>Treatment Code: [N/A - Data not available in current model]</li>
-                    </ul>
-
-                    <Form.Group className="mb-3">
-                        <Form.Label>Notes/Reasoning for {actionStatus}</Form.Label>
-                        <Form.Control 
-                            as="textarea" 
-                            rows={3} 
-                            value={actionNotes}
-                            onChange={(e) => setActionNotes(e.target.value)}
-                            placeholder={`Enter detailed reason for ${actionStatus.toLowerCase()}...`}
-                        />
+                    <Form.Group>
+                        <Form.Label className="fw-bold">Administrator Notes</Form.Label>
+                        <Form.Control as="textarea" rows={3} placeholder="Reason for approval/rejection..." value={actionNotes} onChange={e=>setActionNotes(e.target.value)}/>
                     </Form.Group>
-
-                    <Button 
-                        variant={actionStatus === 'APPROVED' ? 'success' : 'danger'} 
-                        className="w-100 mt-3"
-                        onClick={handleSubmitClaimAction}
-                    >
-                        Confirm {actionStatus}
-                    </Button>
                 </Modal.Body>
+                <Modal.Footer className="bg-light">
+                    <Button variant="outline-secondary" onClick={() => setShowActionModal(false)}>Cancel</Button>
+                    <div className="d-flex gap-2">
+                        <Button variant="danger" onClick={() => { setActionStatus('REJECTED'); handleSubmitClaimAction(); }}>Reject Claim</Button>
+                        <Button variant="success" onClick={() => { setActionStatus('APPROVED'); handleSubmitClaimAction(); }}>Approve Claim</Button>
+                    </div>
+                </Modal.Footer>
             </Modal>
 
-            {/* --- MODAL 2: ADD NEW POLICY (P4) --- */}
-            <Modal show={showPolicyModal} onHide={() => setShowPolicyModal(false)} centered>
-                <Modal.Header closeButton><Modal.Title>Add New Policy Plan</Modal.Title></Modal.Header>
+            {/* Policy Modal */}
+            <Modal show={showPolicyModal} onHide={resetPolicyForm} centered>
+                <Modal.Header closeButton><Modal.Title>{editingPlanId ? "Edit Plan" : "New Plan"}</Modal.Title></Modal.Header>
                 <Modal.Body>
                     <Form onSubmit={handlePolicySubmit}>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Provider</Form.Label>
-                            <Form.Control type="text" value={newPolicyForm.provider} disabled />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Policy Name (e.g., Gold Plan)</Form.Label>
-                            <Form.Control 
-                                type="text" 
-                                required 
-                                value={newPolicyForm.policyName}
-                                onChange={e => setNewPolicyForm({...newPolicyForm, policyName: e.target.value})}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Max Coverage Amount ($)</Form.Label>
-                            <Form.Control 
-                                type="number" 
-                                required 
-                                value={newPolicyForm.coverageAmount}
-                                onChange={e => setNewPolicyForm({...newPolicyForm, coverageAmount: e.target.value})}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Monthly Premium ($)</Form.Label>
-                            <Form.Control 
-                                type="number" 
-                                required 
-                                value={newPolicyForm.premium}
-                                onChange={e => setNewPolicyForm({...newPolicyForm, premium: e.target.value})}
-                            />
-                        </Form.Group>
-                        <Button variant="primary" type="submit" className="w-100">Add Policy</Button>
+                        <Form.Group className="mb-3"><Form.Label>Name</Form.Label><Form.Control type="text" required value={newPolicyForm.policyName} onChange={e => setNewPolicyForm({...newPolicyForm, policyName: e.target.value})}/></Form.Group>
+                        <Row>
+                            <Col><Form.Control type="number" placeholder="Coverage" required value={newPolicyForm.coverageAmount} onChange={e => setNewPolicyForm({...newPolicyForm, coverageAmount: e.target.value})}/></Col>
+                            <Col><Form.Control type="number" placeholder="Premium" required value={newPolicyForm.premium} onChange={e => setNewPolicyForm({...newPolicyForm, premium: e.target.value})}/></Col>
+                        </Row>
+                        <Button variant="primary" type="submit" className="w-100 mt-3">Save Plan</Button>
                     </Form>
                 </Modal.Body>
             </Modal>
-        </>
+        </div>
     );
 };
 

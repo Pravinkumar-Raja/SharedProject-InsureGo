@@ -1,216 +1,260 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Navbar, Button, Row, Col, Card } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
-import { FaShieldAlt, FaUserMd, FaFileInvoiceDollar, FaArrowRight, FaChartLine, FaCheckCircle, FaLock } from 'react-icons/fa';
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import '../App.css';
-
-// --- MOCK DATA FOR GRAPHS ---
-const claimData = [
-  { name: 'Mon', value: 20 },
-  { name: 'Tue', value: 45 },
-  { name: 'Wed', value: 30 },
-  { name: 'Thu', value: 80 },
-  { name: 'Fri', value: 55 },
-  { name: 'Sat', value: 90 },
-  { name: 'Sun', value: 100 },
-];
+import React from 'react';
+import { Container, Navbar, Nav, Button, Row, Col, Badge, Card } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
 
 const LandingPage = () => {
-    const navigate = useNavigate();
-    const [isLoading, setIsLoading] = useState(true);
 
-    // --- 1. SIMULATE LOADING EFFECT ---
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 2500); // 2.5 seconds loading time
-        return () => clearTimeout(timer);
-    }, []);
+    // --- MODERN STYLING CONSTANTS ---
+    const bgDark = "#030712"; // Almost black, deep blue-grey
+    const accentCyan = "#22d3ee"; // Bright Cyan
+    const accentBlue = "#3b82f6"; // Royal Blue
+    
+    // Gradient Text for the Main Headline
+    const gradientText = {
+        background: `linear-gradient(to right, ${accentCyan}, ${accentBlue})`,
+        WebkitBackgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+        backgroundClip: "text",
+        color: "transparent"
+    };
 
-    if (isLoading) {
-        return (
-            <div className="loader-container">
-                <div className="loader-logo">
-                    <FaShieldAlt className="text-accent mb-3" size={60} />
-                    <div>InsureGo<span className="text-accent">Pro</span></div>
-                </div>
-                <div className="loader-bar"><div className="loader-progress"></div></div>
-                <small className="text-muted mt-2">Initializing Secure Health Protocol...</small>
-            </div>
-        );
-    }
+    // The "Glow" behind the hero image
+    const glowEffect = {
+        position: 'absolute',
+        width: '600px',
+        height: '600px',
+        background: `radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, rgba(3, 7, 18, 0) 70%)`,
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 0,
+        pointerEvents: 'none'
+    };
+
+    // Glass Card Style (Bento Grid)
+    const bentoCardStyle = {
+        backgroundColor: "rgba(17, 24, 39, 0.7)", // Dark grey transparent
+        backdropFilter: "blur(12px)",
+        border: "1px solid rgba(255, 255, 255, 0.08)",
+        borderRadius: "16px",
+        color: "white",
+        height: "100%",
+        overflow: "hidden"
+    };
 
     return (
-        <div style={{ backgroundColor: 'var(--bg-light)', minHeight: '100vh', overflowX: 'hidden' }}>
+        <div style={{ backgroundColor: bgDark, minHeight: '100vh', color: 'white', fontFamily: 'Inter, sans-serif' }}>
             
-            {/* --- NAVBAR --- */}
-            <Navbar className="pro-navbar sticky-top" expand="lg">
+            {/* --- 1. NAVBAR (Sticky & Minimal) --- */}
+            <Navbar expand="lg" fixed="top" className="py-3" style={{ 
+                background: 'rgba(3, 7, 18, 0.8)', 
+                backdropFilter: 'blur(10px)', 
+                borderBottom: '1px solid rgba(255,255,255,0.05)' 
+            }}>
                 <Container>
-                    <Navbar.Brand className="d-flex align-items-center gap-2 fw-bold fs-4" style={{ color: 'var(--primary)' }}>
-                        <div className="bg-primary text-white p-2 rounded-3 d-flex align-items-center justify-content-center">
-                            <FaShieldAlt size={20} />
-                        </div>
-                        InsureGo<span style={{ color: 'var(--accent)' }}>Pro</span>
-                    </Navbar.Brand>
-                    
-                    {/* ONLY LOGIN BUTTON AT TOP RIGHT */}
-                    <div className="d-flex gap-3">
-                        <Button className="btn-primary" onClick={() => navigate('/login')}>Log In</Button>
+                    <div className="d-flex align-items-center">
+                        {/* Logo Icon Placeholder */}
+                        <div style={{ width: 24, height: 24, background: accentCyan, borderRadius: 6, marginRight: 10 }}></div>
+                        <Navbar.Brand href="#" className="fw-bold text-white tracking-tight">InsureGo</Navbar.Brand>
                     </div>
+                    <Navbar.Toggle aria-controls="nav" className="border-0 bg-dark" />
+                    <Navbar.Collapse id="nav">
+                        <Nav className="mx-auto">
+                            <Nav.Link href="#features" className="text-white-50 mx-2 hover-white">Platform</Nav.Link>
+                            <Nav.Link href="#security" className="text-white-50 mx-2 hover-white">Security</Nav.Link>
+                            <Nav.Link href="#pricing" className="text-white-50 mx-2 hover-white">For Doctors</Nav.Link>
+                        </Nav>
+                        <div className="d-flex gap-3">
+                            <Link to="/login">
+                                <Button variant="link" className="text-white text-decoration-none fw-semibold">Log in</Button>
+                            </Link>
+                            <Link to="/register">
+                                <Button className="px-4 rounded-pill fw-bold border-0" 
+                                    style={{ background: 'white', color: 'black' }}>
+                                    Sign Up
+                                </Button>
+                            </Link>
+                        </div>
+                    </Navbar.Collapse>
                 </Container>
             </Navbar>
 
-            {/* --- HERO SECTION --- */}
-            <section className="hero-section hero-bg-image py-5 d-flex align-items-center" style={{ minHeight: '90vh' }}>
-                <Container className="position-relative" style={{ zIndex: 2 }}>
-                    <Row className="align-items-center">
-                        <Col lg={6} className="mb-5 mb-lg-0 animate-fade-up">
-                            <div className="d-inline-block px-3 py-1 mb-3 rounded-pill" style={{ background: 'rgba(45, 212, 191, 0.1)', border: '1px solid var(--accent)' }}>
-                                <small className="fw-bold text-accent">🚀 The #1 Health Insurance Portal</small>
-                            </div>
-                            <h1 className="display-3 fw-bold mb-3 text-white lh-sm">
-                                Secure. Fast. <br/>
-                                <span style={{ color: 'var(--accent)', textShadow: '0 0 20px rgba(45, 212, 191, 0.5)' }}>Reliable.</span>
-                            </h1>
-                            <p className="lead text-light opacity-75 mb-5" style={{ maxWidth: '500px' }}>
-                                The unified platform connecting Patients, Doctors, and Insurance Providers. Experience real-time claim processing and instant approvals.
-                            </p>
-                            
-                            {/* CREATE ACCOUNT BUTTON */}
-                            <Button className="btn-glow px-5 py-3 fs-5" onClick={() => navigate('/register')}>
-                                Create Account <FaArrowRight className="ms-2" />
-                            </Button>
+            {/* --- 2. HERO SECTION --- */}
+            <section className="position-relative d-flex align-items-center pt-5" style={{ minHeight: '90vh', overflow: 'hidden' }}>
+                {/* Background Glow */}
+                <div style={glowEffect}></div>
 
-                            <div className="mt-5 d-flex gap-4 opacity-75 text-white">
-                                <div className="d-flex align-items-center gap-2"><FaCheckCircle className="text-accent"/> <span>Instant Claims</span></div>
-                                <div className="d-flex align-items-center gap-2"><FaLock className="text-accent"/> <span>Bank-Grade Security</span></div>
-                            </div>
-                        </Col>
+                <Container className="pt-5 mt-5 position-relative" style={{ zIndex: 1 }}>
+                    <div className="text-center mx-auto" style={{ maxWidth: '800px' }}>
+                        <Badge bg="dark" className="border border-secondary text-info mb-3 px-3 py-2 rounded-pill fw-normal">
+                            ✨ V1.0 is now live
+                        </Badge>
+                        <h1 className="display-3 fw-bold mb-4" style={{ letterSpacing: '-2px', lineHeight: '1.1' }}>
+                            The modern standard for <br />
+                            <span style={gradientText}>insurance management.</span>
+                        </h1>
+                        <p className="lead text-secondary mb-5 px-5" style={{ fontSize: '1.25rem' }}>
+                            Stop juggling paper cards and confusing portals. InsureGo unifies your claims, policies, and provider network into one beautiful dashboard.
+                        </p>
                         
-                        {/* RIGHT SIDE: DASHBOARD PREVIEW */}
-                        <Col lg={6} className="position-relative animate-float delay-200">
-                            {/* Main Glass Card */}
-                            <div className="p-4 rounded-4 shadow-lg mx-auto position-relative" style={{ 
-                                background: 'rgba(255, 255, 255, 0.1)', 
-                                backdropFilter: 'blur(20px)',
-                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                transform: 'rotate(-2deg)' 
-                            }}>
-                                {/* Fake Header */}
-                                <div className="d-flex justify-content-between align-items-center mb-4 text-white">
-                                    <div className="d-flex align-items-center gap-3">
-                                        <div className="bg-primary p-2 rounded-circle"><FaUserMd /></div>
-                                        <div>
-                                            <h6 className="mb-0 fw-bold">Dr. Emily</h6>
-                                            <small className="opacity-75">Cardiology Specialist</small>
-                                        </div>
-                                    </div>
-                                    <Badge bg="success" className="px-3">ONLINE</Badge>
-                                </div>
+                        <div className="d-flex justify-content-center gap-3 mb-5">
+                            <Link to="/register">
+                                <Button size="lg" className="px-5 py-3 rounded-pill fw-bold border-0 shadow-lg" 
+                                    style={{ background: accentCyan, color: '#000' }}>
+                                    Get Started Free
+                                </Button>
+                            </Link>
+                            <Button variant="outline-secondary" size="lg" className="px-5 py-3 rounded-pill fw-bold text-white border-secondary">
+                                View Demo
+                            </Button>
+                        </div>
+                    </div>
 
-                                {/* Fake Stats Row */}
-                                <div className="d-flex gap-3 mb-4">
-                                    <div className="bg-white p-3 rounded-3 flex-grow-1 shadow-sm">
-                                        <small className="text-muted text-uppercase" style={{fontSize: '10px'}}>Patients</small>
-                                        <h4 className="fw-bold text-primary mb-0">1,240</h4>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-3 flex-grow-1 shadow-sm">
-                                        <small className="text-muted text-uppercase" style={{fontSize: '10px'}}>Claims</small>
-                                        <h4 className="fw-bold text-success mb-0">$85k</h4>
-                                    </div>
+                    {/* --- ABSTRACT DASHBOARD MOCKUP --- */}
+                    {/* This represents the "Product" without needing a real screenshot yet */}
+                    <div className="mx-auto mt-5 p-2 rounded-4" 
+                        style={{ 
+                            maxWidth: '1000px', 
+                            background: 'linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0.02))',
+                            border: '1px solid rgba(255,255,255,0.1)'
+                        }}>
+                        <div className="rounded-3 overflow-hidden shadow-lg position-relative" style={{ background: '#0f172a', aspectRatio: '16/9' }}>
+                            {/* Fake UI Header */}
+                            <div className="d-flex align-items-center px-4 py-3 border-bottom border-secondary" style={{ background: '#1e293b' }}>
+                                <div className="d-flex gap-2">
+                                    <div className="rounded-circle bg-danger" style={{width: 10, height: 10}}></div>
+                                    <div className="rounded-circle bg-warning" style={{width: 10, height: 10}}></div>
+                                    <div className="rounded-circle bg-success" style={{width: 10, height: 10}}></div>
                                 </div>
-
-                                {/* Graph Inside Hero */}
-                                <div className="bg-white p-3 rounded-3 shadow-sm">
-                                    <h6 className="text-muted small fw-bold mb-3">Weekly Claim Volume</h6>
-                                    <div style={{ height: '150px', width: '100%' }}>
-                                        <ResponsiveContainer>
-                                            <AreaChart data={claimData}>
-                                                <defs>
-                                                    <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#2dd4bf" stopOpacity={0.8}/>
-                                                        <stop offset="95%" stopColor="#2dd4bf" stopOpacity={0}/>
-                                                    </linearGradient>
-                                                </defs>
-                                                <XAxis dataKey="name" hide />
-                                                <Tooltip />
-                                                <Area type="monotone" dataKey="value" stroke="#0f766e" fillOpacity={1} fill="url(#colorVal)" />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
+                                <div className="mx-auto text-secondary small bg-dark px-3 py-1 rounded">insurego.com/dashboard</div>
                             </div>
-                        </Col>
-                    </Row>
+                            
+                            {/* Fake UI Body (The Grid) */}
+                            <Row className="p-4 h-100">
+                                <Col md={3} className="d-none d-md-block border-end border-secondary p-3">
+                                    <div className="mb-3 bg-secondary opacity-25 rounded" style={{height: 20, width: '60%'}}></div>
+                                    <div className="mb-2 bg-secondary opacity-25 rounded" style={{height: 10, width: '80%'}}></div>
+                                    <div className="mb-2 bg-secondary opacity-25 rounded" style={{height: 10, width: '70%'}}></div>
+                                </Col>
+                                <Col md={9} className="p-3">
+                                    <div className="d-flex justify-content-between mb-4">
+                                        <div className="bg-secondary opacity-25 rounded" style={{height: 30, width: '200px'}}></div>
+                                        <div className="bg-primary rounded" style={{height: 30, width: '100px'}}></div>
+                                    </div>
+                                    <Row className="g-3">
+                                        <Col md={4}><div className="bg-secondary opacity-10 rounded h-100" style={{minHeight: 100}}></div></Col>
+                                        <Col md={4}><div className="bg-secondary opacity-10 rounded h-100" style={{minHeight: 100}}></div></Col>
+                                        <Col md={4}><div className="bg-secondary opacity-10 rounded h-100" style={{minHeight: 100}}></div></Col>
+                                    </Row>
+                                </Col>
+                            </Row>
+                        </div>
+                    </div>
                 </Container>
             </section>
 
-            {/* --- FEATURES SECTION --- */}
-            <Container className="py-5 mt-5">
-                <div className="text-center mb-5 animate-fade-up">
-                    <h6 className="text-accent fw-bold text-uppercase ls-2">Powerful Features</h6>
-                    <h2 className="fw-bold display-6">Designed for Everyone</h2>
+            {/* --- 3. BENTO GRID SECTION (Features) --- */}
+            <Container className="py-5 my-5">
+                <div className="text-center mb-5">
+                    <h6 style={{ color: accentCyan }} className="fw-bold uppercase ls-2">POWERFUL FEATURES</h6>
+                    <h2 className="fw-bold display-5">Everything managed in one place.</h2>
                 </div>
-                
+
                 <Row className="g-4">
-                    {/* Feature 1: Patients */}
-                    <Col md={4} className="animate-fade-up delay-100">
-                        <Card className="feature-card h-100 p-4 border-0 shadow-sm text-center position-relative overflow-hidden">
-                            <div className="mx-auto bg-primary-subtle p-4 rounded-circle mb-4 text-primary d-inline-block">
-                                <FaUserMd size={32} />
-                            </div>
-                            <h4 className="fw-bold">For Patients</h4>
-                            <p className="text-muted">Book appointments, manage prescriptions, and track your insurance claims in real-time.</p>
+                    {/* Large Card - Left */}
+                    <Col lg={7}>
+                        <Card className="p-4" style={bentoCardStyle}>
+                            <Card.Body>
+                                <Badge bg="primary" className="mb-3">Core</Badge>
+                                <h3 className="fw-bold">Universal Insurance Card</h3>
+                                <p className="text-secondary">
+                                    Never lose your physical card again. Upload once, and access a verified digital copy instantly from any device. Securely shareable with doctors via QR code.
+                                </p>
+                                {/* Abstract Visual */}
+                                <div className="mt-4 p-3 rounded" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', border: '1px solid #334155' }}>
+                                    <div className="d-flex align-items-center gap-3">
+                                        <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#3b82f6' }}></div>
+                                        <div>
+                                            <div style={{ width: 120, height: 10, background: '#475569', borderRadius: 4, marginBottom: 8 }}></div>
+                                            <div style={{ width: 80, height: 10, background: '#334155', borderRadius: 4 }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card.Body>
                         </Card>
                     </Col>
 
-                    {/* Feature 2: Doctors */}
-                    <Col md={4} className="animate-fade-up delay-200">
-                        <Card className="feature-card h-100 p-4 border-0 shadow-sm text-center" style={{ borderBottom: '4px solid var(--accent)' }}>
-                            <div className="mx-auto bg-success-subtle p-4 rounded-circle mb-4 text-success d-inline-block">
-                                <FaShieldAlt size={32} />
-                            </div>
-                            <h4 className="fw-bold">For Doctors</h4>
-                            <p className="text-muted">Digital prescription management, instant patient verification, and automated billing.</p>
+                    {/* Small Card - Top Right */}
+                    <Col lg={5}>
+                        <Card className="p-4" style={bentoCardStyle}>
+                            <Card.Body>
+                                <div className="display-4 mb-3">⚡</div>
+                                <h4 className="fw-bold">Instant Claims</h4>
+                                <p className="text-secondary">
+                                    File a claim in under 30 seconds. Our system auto-fills provider data and tracks approval status in real-time.
+                                </p>
+                            </Card.Body>
                         </Card>
                     </Col>
 
-                    {/* Feature 3: Providers */}
-                    <Col md={4} className="animate-fade-up delay-300">
-                        <Card className="feature-card h-100 p-4 border-0 shadow-sm text-center">
-                            <div className="mx-auto bg-warning-subtle p-4 rounded-circle mb-4 text-warning d-inline-block">
-                                <FaFileInvoiceDollar size={32} />
-                            </div>
-                            <h4 className="fw-bold">For Insurers</h4>
-                            <p className="text-muted">Advanced dashboard to verify claims, detect fraud, and process payouts instantly.</p>
+                    {/* Small Card - Bottom Left */}
+                    <Col lg={5}>
+                        <Card className="p-4" style={bentoCardStyle}>
+                            <Card.Body>
+                                <div className="display-4 mb-3">🔒</div>
+                                <h4 className="fw-bold">Bank-Grade Security</h4>
+                                <p className="text-secondary">
+                                    Your health data is encrypted with AES-256. We use Multi-Factor Authentication (OTP) to ensure only you access your records.
+                                </p>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+
+                    {/* Large Card - Bottom Right */}
+                    <Col lg={7}>
+                         <Card className="p-4" style={bentoCardStyle}>
+                            <Card.Body>
+                                <Badge bg="info" className="mb-3 text-dark">Beta</Badge>
+                                <h3 className="fw-bold">Provider Network</h3>
+                                <p className="text-secondary">
+                                    Search for specialists within your insurance network. Filter by rating, distance, and availability. Direct booking integration coming soon.
+                                </p>
+                            </Card.Body>
                         </Card>
                     </Col>
                 </Row>
             </Container>
 
-            {/* --- CTA SECTION --- */}
-            <section className="py-5 bg-white">
+            {/* --- 4. SOCIAL PROOF / TRUST --- */}
+            <div className="py-5 border-top border-secondary border-opacity-10 text-center">
                 <Container>
-                    <div className="bg-primary rounded-5 p-5 text-center text-white position-relative overflow-hidden shadow-lg">
-                        <div className="position-relative" style={{ zIndex: 2 }}>
-                            <h2 className="fw-bold display-6 mb-4">Start your journey today.</h2>
-                            <Button className="btn-glow px-5 py-3 fs-5" onClick={() => navigate('/register')}>Create Account</Button>
-                        </div>
-                    </div>
+                    <p className="text-secondary fw-bold small uppercase mb-4" style={{ letterSpacing: '2px' }}>Trusted by innovative healthcare teams</p>
+                    <Row className="justify-content-center align-items-center opacity-50 grayscale gap-5">
+                         {/* Text placeholders for Logos to keep it code-only */}
+                        <Col xs="auto"><h4 className="fw-bold m-0 text-white">ACME Health</h4></Col>
+                        <Col xs="auto"><h4 className="fw-bold m-0 text-white">MediCare+</h4></Col>
+                        <Col xs="auto"><h4 className="fw-bold m-0 text-white">GlobalInsure</h4></Col>
+                        <Col xs="auto"><h4 className="fw-bold m-0 text-white">TechClinic</h4></Col>
+                    </Row>
                 </Container>
-            </section>
+            </div>
 
-            <footer className="py-4 text-center text-muted bg-light border-top">
-                <small>© 2024 InsureGo Pro. Empowering Healthcare.</small>
-            </footer>
+            {/* --- 5. CTA FOOTER --- */}
+            <div className="py-5 text-center mt-5" style={{ background: 'linear-gradient(to top, rgba(34, 211, 238, 0.05), transparent)' }}>
+                <Container>
+                    <h2 className="display-5 fw-bold mb-4">Ready to simplify your healthcare?</h2>
+                    <Link to="/register">
+                        <Button size="lg" className="px-5 py-3 rounded-pill fw-bold border-0" 
+                            style={{ background: 'white', color: 'black' }}>
+                            Start Now - It's Free
+                        </Button>
+                    </Link>
+                    <p className="mt-3 text-secondary small">No credit card required for patient accounts.</p>
+                </Container>
+            </div>
+
         </div>
     );
 };
-
-// Helper
-const Badge = ({ children, bg, className }) => (
-    <span className={`badge bg-${bg} ${className}`}>{children}</span>
-);
 
 export default LandingPage;

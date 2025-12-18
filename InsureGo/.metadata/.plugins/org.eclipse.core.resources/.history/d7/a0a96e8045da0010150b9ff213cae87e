@@ -1,0 +1,48 @@
+package com.example.demo.dto;
+
+import java.time.LocalDate;
+
+public class ManualEntryRequest {
+    // Core Identification
+    private String policyNo;        
+    private Long userId; 
+    
+    // Policy Details
+    private String insuranceProvider; 
+    private String policyName;      
+    private Double coverageAmount;
+    
+    // --- NEW CRITICAL FIELDS ---
+    private String patientName;     // Name printed on the card
+    private LocalDate registeredDate; // Date of Issue/Start
+    private LocalDate expiryDate;     // Date of Expiry
+
+    // Default Constructor
+    public ManualEntryRequest() {}
+
+    // Getters and Setters
+    public String getPolicyNo() { return policyNo; }
+    public void setPolicyNo(String policyNo) { this.policyNo = policyNo; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getInsuranceProvider() { return insuranceProvider; }
+    public void setInsuranceProvider(String insuranceProvider) { this.insuranceProvider = insuranceProvider; }
+
+    public String getPolicyName() { return policyName; }
+    public void setPolicyName(String policyName) { this.policyName = policyName; }
+
+    public Double getCoverageAmount() { return coverageAmount; }
+    public void setCoverageAmount(Double coverageAmount) { this.coverageAmount = coverageAmount; }
+
+    // New Getters/Setters
+    public String getPatientName() { return patientName; }
+    public void setPatientName(String patientName) { this.patientName = patientName; }
+
+    public LocalDate getRegisteredDate() { return registeredDate; }
+    public void setRegisteredDate(LocalDate registeredDate) { this.registeredDate = registeredDate; }
+
+    public LocalDate getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
+}

@@ -1,0 +1,206 @@
+package com.example.demo.controller;
+
+import com.example.demo.bean.Claim;
+import com.example.demo.repository.ClaimRepository;
+import com.example.demo.service.ClaimService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/claim")
+public class ClaimController {
+	
+    @Autowired ClaimService claimService;
+    @Autowired private ClaimRepository claimRepository;
+
+    // 🟢 1. INITIATE CLAIM (Trusts the Frontend Input completely)
+    @PostMapping("/initiate")
+    public ResponseEntity<Claim> initiateClaim(@RequestBody Claim claim) {
+        
+        // 1. Always ensure a Date is present
+        if (claim.getDateFiled() == null) {
+            claim.setDateFiled(LocalDate.now());
+        }
+
+        // 2. 🟢 REVENUE MATH (Only if amount is provided)
+        if (claim.getTotalBillAmount() != null && claim.getTotalBillAmount() > 0) {
+            
+            // Calculate 80/20 Split
+            double insurancePart = claim.getTotalBillAmount() * 0.80;
+            double userPart = claim.getTotalBillAmount() * 0.20;
+
+            claim.setInsurancePays(insurancePart);
+            claim.setUserPays(userPart);
+
+            // 🟢 STATUS LOGIC: Auto-Approve < $500, else Pending
+            if (claim.getTotalBillAmount() < 500) {
+                claim.setStatus("APPROVED");
+                String desc = claim.getTreatmentDescription() != null ? claim.getTreatmentDescription() : "";
+                claim.setTreatmentDescription(desc + " (Auto-Approved)");
+            } else {
+                claim.setStatus("PENDING_APPROVAL");
+            }
+        } 
+        // 🛑 REMOVED THE "ELSE" BLOCK THAT WAS OVERWRITING DATA WITH "PENDING INPUT"
+        // Now, if the doctor sends an amount, it saves. If description is sent, it saves.
+        // We do NOT force it to 0.0 or "Pending" anymore.
+
+        // 🟢 SAVE EXACTLY WHAT WAS SENT
+        return ResponseEntity.ok(claimRepository.save(claim));
+    }
+
+    // 2. DOCTOR UPDATE (Simplified)
+    @PutMapping("/doctor-update/{policyNo}")
+    public ResponseEntity<?> addMedicalDetails(@PathVariable String policyNo, @RequestBody Claim doctorEntry) {
+        Optional<Claim> existingClaim = claimRepository.findAll().stream()
+            .filter(c -> c.getPolicyNo().equals(policyNo) && c.getStatus().equals("OPEN"))
+            .findFirst();
+
+        if (existingClaim.isPresent()) {
+            Claim claim = existingClaim.get();
+            
+            // 🟢 Update fields directly from input
+            claim.setInsuranceProvider(doctorEntry.getInsuranceProvider());
+            claim.setPatientName(doctorEntry.getPatientName());
+            claim.setDoctorId(doctorEntry.getDoctorId()); 
+            claim.setDoctorName(doctorEntry.getDoctorName());
+            claim.setTotalBillAmount(doctorEntry.getTotalBillAmount());
+            claim.setTreatmentDescription(doctorEntry.getTreatmentDescription());
+
+            // 🟢 Recalculate 80/20
+            if (claim.getTotalBillAmount() != null) {
+                claim.setInsurancePays(claim.getTotalBillAmount() * 0.80);
+                claim.setUserPays(claim.getTotalBillAmount() * 0.20);
+                
+                if (claim.getTotalBillAmount() < 500) {
+                    claim.setStatus("APPROVED");
+                } else {
+                    claim.setStatus("PENDING_APPROVAL");
+                }
+            }
+
+            return ResponseEntity.ok(claimRepository.save(claim));
+        }
+        return ResponseEntity.status(404).body("No open claim found");
+    }
+
+    // 3. PROVIDER VERDICT
+    @PutMapping("/verdict/{id}")
+    public ResponseEntity<Claim> providerVerdict(@PathVariable Long id, @RequestBody String status) {
+        return claimRepository.findById(id).map(claim -> {
+            claim.setStatus(status);
+            // 🟢 Ensure math runs on manual approval
+            if ("APPROVED".equalsIgnoreCase(status) && claim.getTotalBillAmount() != null) {
+                claim.setInsurancePays(claim.getTotalBillAmount() * 0.80);
+                claim.setUserPays(claim.getTotalBillAmount() * 0.20);
+            } else {
+                claim.setInsurancePays(0.0);
+                claim.setUserPays(claim.getTotalBillAmount());
+            }
+            return ResponseEntity.ok(claimRepository.save(claim));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 4. GET ALL
+    @GetMapping("/all")
+    public List<Claim> getAllClaims() { return claimRepository.findAll(); }
+    
+    @GetMapping("/pending-review")
+    public List<Claim> getClaimsPendingReview() { return claimRepository.findByStatus("PENDING_APPROVAL"); }
+
+    @GetMapping("/user/{userId}")
+    public List<Claim> getUserClaims(@PathVariable Long userId) { return claimRepository.findByUserId(userId); }
+    
+    // 5. UPLOAD DOCUMENT
+    @PostMapping("/upload-document/{policyNo}")
+    public ResponseEntity<?> uploadMedicalDoc(@PathVariable String policyNo, @RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty()) return ResponseEntity.badRequest().body("File is empty");
+            String folder = "uploads/medical-reports/";
+            Files.createDirectories(Paths.get(folder)); 
+            String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+            Path path = Paths.get(folder + fileName);
+            Files.write(path, file.getBytes());
+            Optional<Claim> existingClaim = claimRepository.findAll().stream()
+                .filter(c -> c.getPolicyNo().equals(policyNo) && !c.getStatus().equals("CLOSED")).findFirst();
+            if (existingClaim.isPresent()) {
+                Claim claim = existingClaim.get();
+                claim.setMedicalDocumentPath(fileName);
+                claimRepository.save(claim);
+                return ResponseEntity.ok("File uploaded successfully: " + fileName);
+            }
+            return ResponseEntity.status(404).body("No active claim found.");
+        } catch (IOException e) { return ResponseEntity.status(500).body("Failed to upload file"); }
+    }
+    
+    @GetMapping("/provider/metrics/{providerName}")
+    public ResponseEntity<Map<String, Long>> getProviderMetrics(@PathVariable String providerName) {
+        return ResponseEntity.ok(claimService.getProviderMetrics(providerName));
+    }
+    
+    @GetMapping("/provider/highvalue/{providerName}")
+    public ResponseEntity<List<Claim>> getHighValueClaims(@PathVariable String providerName) {
+        return ResponseEntity.ok(claimService.getHighValueClaims(providerName, 500.00));
+    }
+
+    // 6. PROVIDER ACTION (Dashboard)
+    @PutMapping("/provider/action/{claimId}")
+    public ResponseEntity<?> processClaimAction(
+        @PathVariable Long claimId, 
+        @RequestParam String status, 
+        @RequestBody Map<String, Object> notesPayload
+    ) {
+        Optional<Claim> claimOpt = claimRepository.findById(claimId);
+        
+        if (claimOpt.isPresent()) {
+            Claim claim = claimOpt.get();
+            String notes = (String) notesPayload.get("notes");
+            
+            claim.setStatus(status);
+            String currentDesc = claim.getTreatmentDescription() == null ? "" : claim.getTreatmentDescription();
+            claim.setTreatmentDescription(currentDesc + " | Provider Action: " + notes);
+            
+            if ("APPROVED".equalsIgnoreCase(status) && claim.getTotalBillAmount() != null) {
+                claim.setInsurancePays(claim.getTotalBillAmount() * 0.80);
+                claim.setUserPays(claim.getTotalBillAmount() * 0.20);
+            } else if ("REJECTED".equalsIgnoreCase(status)) {
+                claim.setInsurancePays(0.0);
+                claim.setUserPays(claim.getTotalBillAmount());
+            }
+            
+            return ResponseEntity.ok(claimRepository.save(claim));
+        }
+        return ResponseEntity.status(404).body("Claim not found");
+    }
+
+    // 7. GET PROVIDER CLAIMS
+    @GetMapping("/provider/all/{providerName}")
+    public ResponseEntity<List<Claim>> getAllProviderClaims(@PathVariable String providerName) {
+        return ResponseEntity.ok(claimRepository.findAll());
+    }
+    
+    // 8. DOCTOR STATS
+    @GetMapping("/doctor-stats/{doctorName}")
+    public Map<String, Object> getDoctorRevenue(@PathVariable String doctorName) {
+        List<Claim> claims = claimRepository.findAll();
+        double totalRevenue = claims.stream()
+            .mapToDouble(c -> c.getTotalBillAmount() != null ? c.getTotalBillAmount() : 0.0)
+            .sum();
+        Map<String, Object> response = new HashMap<>();
+        response.put("revenue", totalRevenue);
+        return response;
+    }
+}

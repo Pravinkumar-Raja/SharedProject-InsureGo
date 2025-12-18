@@ -1,0 +1,175 @@
+package com.example.demo.controller;
+
+import com.example.demo.bean.*;
+import com.example.demo.dto.*;
+import com.example.demo.repository.InsuranceRepository;
+import com.example.demo.repository.InsurancePlanRepository; // Make sure to create this!
+import com.example.demo.service.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/insurance")
+@CrossOrigin(origins = "http://localhost:5173") // Allow React Frontend
+public class InsuranceController {
+
+    @Autowired private InsuranceService service;
+    @Autowired private InsuranceRepository repository;      // For Active User Policies
+    @Autowired private InsurancePlanRepository planRepository; // For Marketplace Plans (NEW)
+
+    // ==========================================
+    // 🛒 NEW: MARKETPLACE ENDPOINTS (Plans)
+    // ==========================================
+
+    // 1. Provider adds a new Plan to the Marketplace
+    @PostMapping("/plans/add")
+    public InsurancePlan createPlan(@RequestBody InsurancePlan plan) {
+        return planRepository.save(plan);
+    }
+
+    // 2. Patient fetches ALL available plans for "Buy Policy" tab
+    @GetMapping("/plans/all")
+    public List<InsurancePlan> getAllPlans() {
+        return planRepository.findAll();
+    }
+
+    // ==========================================
+    // 💳 NEW: PURCHASE ENDPOINT
+    // ==========================================
+
+    // 3. Patient BUYS a plan -> Creates an InsuranceCard in "My Wallet"
+    @PostMapping("/purchase")
+    public ResponseEntity<?> purchasePolicy(@RequestBody PurchaseRequest request) {
+        // A. Fetch the Plan details (to ensure price/benefits are correct)
+        Optional<InsurancePlan> planOpt = planRepository.findById(request.getPlanId());
+        
+        if (planOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Plan not found");
+        }
+        InsurancePlan plan = planOpt.get();
+
+        // B. Create the User's Policy Card
+        InsuranceCard newCard = new InsuranceCard();
+        newCard.setUserId(request.getUserId());
+        newCard.setPatientName(request.getPatientName());
+        
+        // Copy details from the Plan Template to the User's Card
+        newCard.setInsuranceProvider(plan.getInsuranceProvider());
+        newCard.setPolicyName(plan.getPolicyName());
+        newCard.setCoverageAmount(plan.getCoverageAmount());
+        newCard.setPremium(plan.getPremium());
+        
+        // Generate Unique Details
+        newCard.setPolicyNumber("POL-" + System.currentTimeMillis()); // Unique ID
+        newCard.setStatus("ACTIVE");
+        newCard.setRegisteredDate(LocalDate.now());
+        newCard.setExpiryDate(LocalDate.now().plusYears(1));
+
+        // C. Save to User's Wallet Table
+        repository.save(newCard);
+
+        return ResponseEntity.ok("Policy Purchased Successfully! ID: " + newCard.getPolicyNumber());
+    }
+
+    // 4. Fetch Enrolled Patients (For Provider Dashboard)
+    @GetMapping("/provider/{providerName}")
+    public List<InsuranceCard> getProviderCustomers(@PathVariable String providerName) {
+        // Fetch all active cards and filter by provider name
+        return repository.findAll().stream()
+                .filter(c -> c.getInsuranceProvider() != null && 
+                             c.getInsuranceProvider().equalsIgnoreCase(providerName))
+                .collect(Collectors.toList());
+    }
+
+    // ==========================================
+    // 📂 EXISTING ENDPOINTS (KEPT AS IS)
+    // ==========================================
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<InsuranceCard> updatePolicy(@PathVariable Long id, @RequestBody InsuranceCard cardDetails) {
+        try {
+            InsuranceCard updatedCard = service.updatePolicy(id, cardDetails);
+            return ResponseEntity.ok(updatedCard);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<String> deletePolicy(@PathVariable Long id) {
+        service.deletePolicy(id);
+        return ResponseEntity.ok("Policy deleted successfully");
+    }
+
+    @PostMapping("/upload-card")
+    public ResponseEntity<InsuranceCard> uploadCard(
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "Authorization", required = false) String token) {
+        try {
+            Long userId = 1L; 
+            return ResponseEntity.accepted().body(service.processCardUpload(file, userId));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PutMapping("/renew/{policyNumber}")
+    public ResponseEntity<?> renewPolicy(@PathVariable String policyNumber) {
+        Optional<InsuranceCard> policyOpt = repository.findAll().stream()
+            .filter(p -> p.getPolicyNumber().equals(policyNumber))
+            .findFirst();
+
+        if (policyOpt.isPresent()) {
+            InsuranceCard policy = policyOpt.get();
+            LocalDate today = LocalDate.now();
+            LocalDate currentExpiry = policy.getExpiryDate();
+            LocalDate newExpiry;
+
+            if (currentExpiry == null || currentExpiry.isBefore(today)) {
+                newExpiry = today.plusYears(1);
+            } else {
+                newExpiry = currentExpiry.plusYears(1);
+            }
+            
+            policy.setExpiryDate(newExpiry);
+            policy.setStatus("ACTIVE"); 
+            
+            repository.save(policy);
+            return ResponseEntity.ok("Policy Renewed! Status is now ACTIVE until: " + newExpiry);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/verify/{policyNumber}")
+    public ResponseEntity<?> verifyPolicy(@PathVariable String policyNumber) {
+        Optional<InsuranceCard> policyOpt = repository.findAll().stream()
+            .filter(p -> p.getPolicyNumber().equals(policyNumber))
+            .findFirst();
+
+        if (policyOpt.isPresent()) {
+            return ResponseEntity.ok(policyOpt.get());
+        }
+        return ResponseEntity.status(404).body("Policy Not Found");
+    }
+
+    @PostMapping("/manual-entry")
+    public ResponseEntity<InsuranceCard> manualEntry(
+            @RequestBody ManualEntryRequest request,
+            @RequestHeader(value = "Authorization", required = false) String token) {
+        Long userId = 1L; 
+        return ResponseEntity.ok(service.saveManualPolicy(request, userId));
+    }
+
+    @GetMapping("/list")
+    public List<InsuranceCard> listPolicies(@RequestHeader(value = "Authorization", required = false) String token) {
+        // Return ALL policies so the frontend can filter (Wallet vs. Marketplace)
+        return repository.findAll();
+    }
+}

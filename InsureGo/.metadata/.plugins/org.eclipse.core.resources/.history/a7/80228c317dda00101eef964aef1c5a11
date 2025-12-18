@@ -1,0 +1,7 @@
+package com.example.demo.dto;
+
+class PurchaseRequest {
+    private Long userId;
+    private String patientName;
+    private Long planId; // ID of the plan they clicked
+}

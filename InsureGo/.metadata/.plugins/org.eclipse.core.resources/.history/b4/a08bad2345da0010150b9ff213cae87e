@@ -1,0 +1,43 @@
+package com.example.demo.dto;
+
+
+import java.time.LocalDate;
+
+public class ManualEntryRequest {
+    private String policyNumber;
+    private String policyName;
+    private String provider;
+    private String patientName;
+    private LocalDate expiryDate;
+
+    // Default Constructor (Critical for JSON parsing)
+    public ManualEntryRequest() {}
+
+    public ManualEntryRequest(String policyNumber, String provider, String patientName, LocalDate expiryDate) {
+        this.policyNumber = policyNumber;
+        this.provider = provider;
+        this.patientName = patientName;
+        this.expiryDate = expiryDate;
+    }
+
+    public String getPolicyName() {
+		return policyName;
+	}
+
+	public void setPolicyName(String policyName) {
+		this.policyName = policyName;
+	}
+
+	// Getters and Setters
+    public String getPolicyNumber() { return policyNumber; }
+    public void setPolicyNumber(String policyNumber) { this.policyNumber = policyNumber; }
+
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+
+    public String getPatientName() { return patientName; }
+    public void setPatientName(String patientName) { this.patientName = patientName; }
+
+    public LocalDate getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
+}

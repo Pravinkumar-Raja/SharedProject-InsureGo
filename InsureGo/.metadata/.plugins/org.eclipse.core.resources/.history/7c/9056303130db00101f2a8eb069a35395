@@ -1,0 +1,65 @@
+package com.example.demo.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.cors.CorsConfiguration; // Critical Import
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource; // Critical Import
+
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+    
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // 1. Disable CSRF (React needs this disabled to send POST data)
+            .csrf(csrf -> csrf.disable())
+            
+            // 2. Enable CORS using the Bean defined below
+            .cors(Customizer.withDefaults()) 
+            
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/auth/**").permitAll() // Allow Login/Register
+                .requestMatchers("/user/name/**").permitAll()
+                .anyRequest().authenticated() 
+            );
+        
+        return http.build();
+    }
+
+    // ⚠️ THIS IS THE MISSING PIECE THAT FIXES YOUR ERROR ⚠️
+    @Bean
+    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // 1. Allow React Frontend
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
+        
+        // 2. Allow All Methods (GET, POST, PUT, DELETE)
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // 3. Allow All Headers (Authorization, Content-Type)
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        
+        // 4. Allow Credentials
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration); // Apply to ALL paths
+        return source;
+    }
+}

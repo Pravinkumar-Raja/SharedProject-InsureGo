@@ -1,33 +1,44 @@
 package com.example.demo.dto;
 
-
 import java.time.LocalDate;
 
 public class ManualEntryRequest {
+    // We do NOT use @Entity or @Id here. This is just a JSON holder.
+
     private String policyNumber;
-    private String provider;
+    private String insuranceProvider;
+    private String policyName;
+    private Double coverageAmount;
+    private Long userId;
+    
     private String patientName;
+    private LocalDate registeredDate; // Service calls getRegisteredDate()
     private LocalDate expiryDate;
 
-    // Default Constructor (Critical for JSON parsing)
+    // --- CONSTRUCTORS ---
     public ManualEntryRequest() {}
 
-    public ManualEntryRequest(String policyNumber, String provider, String patientName, LocalDate expiryDate) {
-        this.policyNumber = policyNumber;
-        this.provider = provider;
-        this.patientName = patientName;
-        this.expiryDate = expiryDate;
-    }
-
-    // Getters and Setters
+    // --- GETTERS AND SETTERS ---
     public String getPolicyNumber() { return policyNumber; }
     public void setPolicyNumber(String policyNumber) { this.policyNumber = policyNumber; }
 
-    public String getProvider() { return provider; }
-    public void setProvider(String provider) { this.provider = provider; }
+    public String getInsuranceProvider() { return insuranceProvider; }
+    public void setInsuranceProvider(String insuranceProvider) { this.insuranceProvider = insuranceProvider; }
+
+    public String getPolicyName() { return policyName; }
+    public void setPolicyName(String policyName) { this.policyName = policyName; }
+
+    public Double getCoverageAmount() { return coverageAmount; }
+    public void setCoverageAmount(Double coverageAmount) { this.coverageAmount = coverageAmount; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 
     public String getPatientName() { return patientName; }
     public void setPatientName(String patientName) { this.patientName = patientName; }
+
+    public LocalDate getRegisteredDate() { return registeredDate; }
+    public void setRegisteredDate(LocalDate registeredDate) { this.registeredDate = registeredDate; }
 
     public LocalDate getExpiryDate() { return expiryDate; }
     public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }

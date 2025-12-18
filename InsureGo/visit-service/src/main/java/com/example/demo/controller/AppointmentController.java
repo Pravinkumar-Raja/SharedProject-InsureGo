@@ -59,7 +59,7 @@ public class AppointmentController {
     public List<Appointment> getDoctorSchedule(@PathVariable Long doctorId) {
         return service.getAppointmentsByDoctor(doctorId);
     }
-
+    
     // 2. Mark Appointment as Completed
     @PutMapping("/status/{id}")
     public ResponseEntity<Appointment> updateStatus(@PathVariable Long id, @RequestBody String status) {

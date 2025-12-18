@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// Assuming the API Gateway or main application runs on 8080
+// ⚠️ CRITICAL FIX FOR GATEWAY ⚠️
 const API_URL = 'http://localhost:8080/api'; 
+
 const api = axios.create({ baseURL: API_URL });
 
 api.interceptors.request.use(
@@ -14,46 +15,48 @@ api.interceptors.request.use(
 );
 
 export default {
-    // Auth & Users
+    // --- AUTH ---
     login: (email, password) => api.post('/auth/login', { email, password }),
-    
-    // FIX: Maps api.requestOtp (used in Register.jsx) to the backend's /auth/register/request-phone-otp
+    register: (userData) => api.post('/auth/register', userData),
     requestOtp: (data) => api.post('/auth/register/request-phone-otp', data),
-    
-    // FIX: Maps api.verifyOtp (used in Register.jsx) to the backend's /auth/register/verify-phone-otp
     verifyOtp: (data) => api.post('/auth/register/verify-phone-otp', data),
 
-    register: (data) => api.post('/auth/register', data),
+    // --- PATIENT ---
+    getAllPolicies: () => api.get('/insurance/list'), 
+    getMyPolicies: (userId) => api.get(`/insurance/user/${userId}`),
+    getMarketplacePlans: () => api.get('/insurance/plans/all'),
+    purchasePolicy: (data) => api.post('/insurance/purchase', data),
+    
+    // Manual Policy Management
+    addPolicy: (data) => api.post('/insurance/manual-entry', data), 
+    updatePolicy: (id, data) => api.put(`/insurance/update/${id}`, data), 
+    deletePolicy: (id) => api.delete(`/insurance/delete/${id}`), 
+    renewPolicy: (policyNo) => api.put(`/insurance/renew/${policyNo}`),
+
+    // --- PROVIDER ---
+    getProviderCustomers: (providerName) => api.get(`/insurance/provider/${providerName}`),
+    addMarketplacePlan: (data) => api.post('/insurance/plans/add', data),
+    deleteMarketplacePlan: (id) => api.delete(`/insurance/plans/delete/${id}`),
+    updateMarketplacePlan: (id, data) => api.put(`/insurance/plans/update/${id}`, data),
+    
+    getAllProviderClaims: (providerName) => api.get(`/claim/provider/all/${providerName}`),
+    getProviderMetrics: (providerName) => api.get(`/claim/provider/metrics/${providerName}`),
+    processClaimAction: (claimId, status, notes) => api.put(`/claim/provider/action/${claimId}?status=${status}`, notes),
+
+    // --- DOCTOR ---
+    getDoctorSchedule: (doctorId) => api.get(`/appointment/doctor/${doctorId}`), 
+    verifyPolicy: (policyNo) => api.get(`/insurance/verify/${policyNo}`), 
+    initiateClaim: (data) => api.post('/claim/initiate', data),
+    updateAppointmentStatus: (id, status) => api.put(`/appointment/status/${id}`, status, { headers: { 'Content-Type': 'text/plain' } }),
+    getDoctorStats: (doctorId) => api.get(`/dashboard/doctor-stats/${doctorId}`),
+
+    // --- COMMON ---
+    submitReview: (data) => api.post('/dashboard/review', data), 
+    getMyClaims: (userId) => api.get(`/claim/user/${userId}`),
+    getMyAppointments: (id) => api.get(`/appointment/user/${id}`),
     getDoctors: () => api.get('/auth/doctors'),
     
-    // Insurance (Policy Service)
-    getPolicies: () => api.get('/insurance/list'),
-    renewPolicy: (policyNo) => api.put(`/insurance/renew/${policyNo}`),
-    verifyPolicy: (policyNo) => api.get(`/insurance/verify/${policyNo}`), 
-    addPolicy: (data) => api.post('/policy/add', data), 
-
-    // Appointments (Visit Service)
+    // FIXED: Bridge for saving appointments
     bookAppointment: (data) => api.post('/appointment/book', data),
-    rescheduleAppointment: (id, data) => api.put(`/appointment/reschedule/${id}`, data), 
-    getMyAppointments: (id) => api.get(`/appointment/user/${id}`),
-    getDoctorSchedule: (doctorId) => api.get(`/appointment/doctor/${doctorId}`), 
-    updateAppointmentStatus: (id, status) => api.put(`/appointment/status/${id}`, status, { headers: { 'Content-Type': 'text/plain' } }),
-
-    // Claims (Claim Service)
-    initiateClaim: (data) => api.post('/claim/initiate', data),
-    getMyClaims: (userId) => api.get(`/claim/user/${userId}`),
-    submitClaim: (data) => api.put(`/claim/doctor-update/${data.policyNo}`, data), 
     
-    // Provider Dashboard Endpoints
-    getProviderMetrics: (providerName) => api.get(`/claim/provider/metrics/${providerName}`),
-    getHighValueClaims: (providerName) => api.get(`/claim/provider/highvalue/${providerName}`),
-    getAllProviderClaims: (providerName) => api.get(`/claim/provider/all/${providerName}`),
-    processClaimAction: (claimId, status, notes) => api.put(
-        `/claim/provider/action/${claimId}?status=${status}`, 
-        notes 
-    ),
-    
-    // Dashboard & Reviews
-    getDoctorStats: (doctorId) => api.get(`/dashboard/doctor-stats/${doctorId}`),
-    submitReview: (data) => api.post('/dashboard/review', data), 
 };

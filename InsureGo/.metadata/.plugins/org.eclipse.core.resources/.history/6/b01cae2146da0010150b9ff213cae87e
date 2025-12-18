@@ -1,0 +1,74 @@
+package com.example.demo.bean;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "insurance_cards")
+public class InsuranceCard {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String policyNumber;
+    private String insuranceProvider;
+    private String policyName;
+    private Double coverageAmount;
+    private Long userId;
+    
+    // --- NEW FIELDS (These were missing) ---
+    private String status;       // e.g. "ACTIVE"
+    private String patientName;  // e.g. "John Doe"
+    private LocalDate issueDate; // Registration Date
+    private LocalDate expiryDate;
+
+    // --- CONSTRUCTORS ---
+    public InsuranceCard() {}
+
+    public InsuranceCard(String policyNumber, String insuranceProvider, String policyName, Double coverageAmount, Long userId, String status, String patientName, LocalDate issueDate, LocalDate expiryDate) {
+        this.policyNumber = policyNumber;
+        this.insuranceProvider = insuranceProvider;
+        this.policyName = policyName;
+        this.coverageAmount = coverageAmount;
+        this.userId = userId;
+        this.status = status;
+        this.patientName = patientName;
+        this.issueDate = issueDate;
+        this.expiryDate = expiryDate;
+    }
+
+    // --- GETTERS AND SETTERS (Crucial for the error fix) ---
+
+    // FIX: This is the method that was undefined
+    public LocalDate getIssueDate() { return issueDate; }
+    public void setIssueDate(LocalDate issueDate) { this.issueDate = issueDate; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public String getPatientName() { return patientName; }
+    public void setPatientName(String patientName) { this.patientName = patientName; }
+
+    // Standard Getters/Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getPolicyNumber() { return policyNumber; }
+    public void setPolicyNumber(String policyNumber) { this.policyNumber = policyNumber; }
+
+    public String getInsuranceProvider() { return insuranceProvider; }
+    public void setInsuranceProvider(String insuranceProvider) { this.insuranceProvider = insuranceProvider; }
+
+    public String getPolicyName() { return policyName; }
+    public void setPolicyName(String policyName) { this.policyName = policyName; }
+
+    public Double getCoverageAmount() { return coverageAmount; }
+    public void setCoverageAmount(Double coverageAmount) { this.coverageAmount = coverageAmount; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public LocalDate getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
+}

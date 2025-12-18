@@ -1,7 +1,5 @@
 package com.example.demo.controller;
 
-
-
 import com.example.demo.bean.Claim;
 import com.example.demo.repository.ClaimRepository;
 import com.example.demo.service.ClaimService;
@@ -15,7 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDate; // Required for Rule Engine
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,26 +23,63 @@ import java.util.Optional;
 @RequestMapping("/claim")
 public class ClaimController {
 	
-	@Autowired ClaimService claimService;
-    @Autowired
-    private ClaimRepository claimRepository;
+    @Autowired ClaimService claimService;
+    @Autowired private ClaimRepository claimRepository;
 
-    // 1. PATIENT: Initiates the Claim
+    // 🟢 1. INITIATE CLAIM (Uses doctorName from Bean + Fixes Revenue)
     @PostMapping("/initiate")
     public ResponseEntity<Claim> initiateClaim(@RequestBody Claim claim) {
-        claim.setStatus("OPEN");
-        claim.setInsurancePays(0.0);
-        claim.setUserPays(0.0);
-        claim.setTotalBillAmount(0.0);
-        claim.setTreatmentDescription("Pending Doctor Input");
-        claim.setDateFiled(LocalDate.now()); // Ensure date is set for duplicate check
+        
+        // 1. Set Date if missing
+        if (claim.getDateFiled() == null) {
+            claim.setDateFiled(LocalDate.now());
+        }
+
+        // 2. CHECK: Is this a Doctor Submission? (Amount > 0)
+        Double amount = claim.getTotalBillAmount();
+        
+        if (amount != null && amount > 0) {
+            
+            // 🟢 MATH FIX: Calculate 80/20 Split Immediately
+            double insurancePart = amount * 0.80;
+            double userPart = amount * 0.20;
+
+            claim.setInsurancePays(insurancePart); 
+            claim.setUserPays(userPart); // 🟢 This saves the user cost!
+
+            // Rule: Auto-Approve < $500
+            if (amount < 500) {
+                claim.setStatus("APPROVED");
+                String desc = claim.getTreatmentDescription() != null ? claim.getTreatmentDescription() : "Claim";
+                claim.setTreatmentDescription(desc + " (Auto-Approved < $500)");
+            } else {
+                // High Value -> Pending Provider Action
+                claim.setStatus("PENDING_APPROVAL"); 
+                // Reset split for manual review (optional, or keep the calc)
+                claim.setInsurancePays(0.0);
+                claim.setUserPays(0.0);
+            }
+            
+        } else {
+            // 3. PATIENT INITIALIZATION (Empty Claim)
+            // Only set defaults if the frontend didn't send them
+            if (claim.getStatus() == null) claim.setStatus("OPEN");
+            if (claim.getTotalBillAmount() == null) claim.setTotalBillAmount(0.0);
+            if (claim.getInsurancePays() == null) claim.setInsurancePays(0.0);
+            if (claim.getUserPays() == null) claim.setUserPays(0.0);
+            
+            if (claim.getTreatmentDescription() == null) {
+                claim.setTreatmentDescription("Pending Doctor Input");
+            }
+        }
+
+        // 🟢 SAVE: This will now save 'doctorName' because it's in your Bean!
         return ResponseEntity.ok(claimRepository.save(claim));
     }
 
-    // 2. DOCTOR: Adds Bill & Treatment (Includes RULE ENGINE)
+    // 2. DOCTOR UPDATE (For existing 'OPEN' claims)
     @PutMapping("/doctor-update/{policyNo}")
     public ResponseEntity<?> addMedicalDetails(@PathVariable String policyNo, @RequestBody Claim doctorEntry) {
-        
         Optional<Claim> existingClaim = claimRepository.findAll().stream()
             .filter(c -> c.getPolicyNo().equals(policyNo) && c.getStatus().equals("OPEN"))
             .findFirst();
@@ -53,65 +88,62 @@ public class ClaimController {
             Claim claim = existingClaim.get();
             Double billAmount = doctorEntry.getTotalBillAmount();
 
-            // --- 🛡️ RULE 1: DUPLICATE BILL CHECK ---
+            // Duplicate Check
             boolean isDuplicate = claimRepository.existsByPolicyNoAndTotalBillAmountAndDateFiled(
                 policyNo, billAmount, LocalDate.now()
             );
 
             if (isDuplicate) {
-                // Reject immediately if it's a duplicate request from today
                 claim.setStatus("REJECTED");
                 claim.setTreatmentDescription("System Auto-Rejection: Duplicate Claim Detected");
                 claim.setTotalBillAmount(billAmount);
                 return ResponseEntity.ok(claimRepository.save(claim));
             }
 
-            // Update Details
-            
-            // --- FIX 1: SET INSURANCE PROVIDER NAME ---
-            // The doctorEntry payload now includes the insuranceProvider name from the Doctor Dashboard
+            // Update Fields from Payload
             claim.setInsuranceProvider(doctorEntry.getInsuranceProvider());
-            // ------------------------------------------
+            claim.setPatientName(doctorEntry.getPatientName());
+            
+            // 🟢 Update Doctor Details (Since Bean has them now)
+            claim.setDoctorId(doctorEntry.getDoctorId()); 
+            claim.setDoctorName(doctorEntry.getDoctorName());
             
             claim.setTotalBillAmount(billAmount);
             claim.setTreatmentDescription(doctorEntry.getTreatmentDescription());
 
-            // --- ⚡ RULE 2: AUTO-APPROVAL (Fast Track) ---
-            if (billAmount < 500) { 
-                // Auto-Approve logic: Claims under $500 get instant approval
-                claim.setStatus("APPROVED"); 
-                
-                // Calculate Split (80% Insurance / 20% User)
-                claim.setInsurancePays(billAmount * 0.80);
-                claim.setUserPays(billAmount * 0.20);
-                
-                // Append note so Admin knows it was a Bot
-                claim.setTreatmentDescription(claim.getTreatmentDescription() + " (Auto-Approved by System)");
-            } 
-            else {
-                // --- ✋ RULE 3: MANUAL REVIEW ---
-                // High value claims (> $500) go to Provider
-                claim.setStatus("PENDING_APPROVAL"); 
+            // 🟢 80/20 Logic for Update
+            if (billAmount != null) {
+                if (billAmount < 500) { 
+                    claim.setStatus("APPROVED"); 
+                    claim.setInsurancePays(billAmount * 0.80);
+                    claim.setUserPays(billAmount * 0.20);
+                    claim.setTreatmentDescription(claim.getTreatmentDescription() + " (Auto-Approved < $500)");
+                } else {
+                    claim.setStatus("PENDING_APPROVAL"); 
+                    claim.setInsurancePays(0.0);
+                    claim.setUserPays(0.0);
+                }
             }
 
             return ResponseEntity.ok(claimRepository.save(claim));
         }
         return ResponseEntity.status(404).body("No open claim found for this Policy ID");
     }
-    
-    // 3. PROVIDER: Approves/Rejects & Calculates Split
+
+    // 3. PROVIDER VERDICT (Manual)
     @PutMapping("/verdict/{id}")
     public ResponseEntity<Claim> providerVerdict(@PathVariable Long id, @RequestBody String status) {
         return claimRepository.findById(id).map(claim -> {
             claim.setStatus(status);
             
-            if (status.equals("APPROVED")) {
+            // 🟢 Ensure math runs on manual approval
+            if ("APPROVED".equalsIgnoreCase(status) && claim.getTotalBillAmount() != null) {
                 double total = claim.getTotalBillAmount();
                 claim.setInsurancePays(total * 0.80);
                 claim.setUserPays(total * 0.20);
             } else {
                 claim.setInsurancePays(0.0);
-                claim.setUserPays(claim.getTotalBillAmount());
+                claim.setUserPays(claim.getTotalBillAmount() != null ? claim.getTotalBillAmount() : 0.0);
             }
             return ResponseEntity.ok(claimRepository.save(claim));
         }).orElse(ResponseEntity.notFound().build());
@@ -120,47 +152,40 @@ public class ClaimController {
     // 4. GET ALL
     @GetMapping("/all")
     public List<Claim> getAllClaims() { return claimRepository.findAll(); }
+    
     @GetMapping("/pending-review")
     public List<Claim> getClaimsPendingReview() {
-        // This calls the service to filter the database query to only include
-        // claims with the status PENDING_APPROVAL (which are claims > $500).
         return claimRepository.findByStatus("PENDING_APPROVAL");
     }
+
     // 5. GET USER CLAIMS
     @GetMapping("/user/{userId}")
     public List<Claim> getUserClaims(@PathVariable Long userId) { return claimRepository.findByUserId(userId); }
     
- // --- 6. UPLOAD MEDICAL DOCUMENT (Doctor) ---
+    // 6. UPLOAD DOCUMENT
     @PostMapping("/upload-document/{policyNo}")
     public ResponseEntity<?> uploadMedicalDoc(@PathVariable String policyNo, @RequestParam("file") MultipartFile file) {
         try {
-            // 1. Check if the file is empty
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body("File is empty");
-            }
+            if (file.isEmpty()) return ResponseEntity.badRequest().body("File is empty");
 
-            // 2. Save the file locally (For Demo purposes)
-            // In a real app, this goes to AWS S3
             String folder = "uploads/medical-reports/";
-            Files.createDirectories(Paths.get(folder)); // Ensure folder exists
+            Files.createDirectories(Paths.get(folder)); 
             
             String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
             Path path = Paths.get(folder + fileName);
             Files.write(path, file.getBytes());
 
-            // 3. Link file to the Claim
             Optional<Claim> existingClaim = claimRepository.findAll().stream()
                 .filter(c -> c.getPolicyNo().equals(policyNo) && !c.getStatus().equals("CLOSED"))
                 .findFirst();
 
             if (existingClaim.isPresent()) {
                 Claim claim = existingClaim.get();
-                claim.setMedicalDocumentPath(fileName); // Save reference in DB
+                claim.setMedicalDocumentPath(fileName);
                 claimRepository.save(claim);
                 return ResponseEntity.ok("File uploaded successfully: " + fileName);
             }
-
-            return ResponseEntity.status(404).body("No active claim found for this policy.");
+            return ResponseEntity.status(404).body("No active claim found.");
 
         } catch (IOException e) {
             return ResponseEntity.status(500).body("Failed to upload file");
@@ -169,70 +194,62 @@ public class ClaimController {
     
     @GetMapping("/provider/metrics/{providerName}")
     public ResponseEntity<Map<String, Long>> getProviderMetrics(@PathVariable String providerName) {
-        Map<String, Long> metrics = claimService.getProviderMetrics(providerName);
-        return ResponseEntity.ok(metrics);
+        return ResponseEntity.ok(claimService.getProviderMetrics(providerName));
     }
     
-   
     @GetMapping("/provider/highvalue/{providerName}")
     public ResponseEntity<List<Claim>> getHighValueClaims(@PathVariable String providerName) {
-        // Set a default threshold for manual verification (e.g., $500)
-        double reviewThreshold = 500.00; 
-        List<Claim> claims = claimService.getHighValueClaims(providerName, reviewThreshold);
-        return ResponseEntity.ok(claims);
+        return ResponseEntity.ok(claimService.getHighValueClaims(providerName, 500.00));
     }
 
-    // P3: Claim Action endpoint (to be implemented next)
-    @PutMapping("/provider/action/{claimId}") // NOTE: Added /provider to match frontend URL structure
+    // 7. PROVIDER ACTION (Dashboard)
+    @PutMapping("/provider/action/{claimId}")
     public ResponseEntity<?> processClaimAction(
         @PathVariable Long claimId, 
-        @RequestParam String status, // 'APPROVED' or 'REJECTED'
-        @RequestBody Map<String, Object> notes // Optional notes/reasoning
+        @RequestParam String status, 
+        @RequestBody Map<String, Object> notesPayload
     ) {
-        String reviewer = (String)notes.get("reviewedBy");
-        String detailedNotes = (String)notes.get("notes");
-
-        Optional<Claim> updatedClaim = claimService.updateClaimStatusWithNotes(
-            claimId, 
-            status, 
-            detailedNotes, 
-            reviewer
-        );
-
-        if (updatedClaim.isPresent()) {
-            return ResponseEntity.ok(updatedClaim.get());
-        } else {
-            return ResponseEntity.status(404).body("Claim not found or update failed.");
+        Optional<Claim> claimOpt = claimRepository.findById(claimId);
+        
+        if (claimOpt.isPresent()) {
+            Claim claim = claimOpt.get();
+            String notes = (String) notesPayload.get("notes");
+            
+            claim.setStatus(status);
+            String currentDesc = claim.getTreatmentDescription() == null ? "" : claim.getTreatmentDescription();
+            claim.setTreatmentDescription(currentDesc + " | Provider Action: " + notes);
+            
+            // 🟢 Ensure Dashboard Approval also uses 80/20
+            if ("APPROVED".equalsIgnoreCase(status)) {
+                double total = claim.getTotalBillAmount() != null ? claim.getTotalBillAmount() : 0.0;
+                claim.setInsurancePays(total * 0.80);
+                claim.setUserPays(total * 0.20);
+            } else if ("REJECTED".equalsIgnoreCase(status)) {
+                double total = claim.getTotalBillAmount() != null ? claim.getTotalBillAmount() : 0.0;
+                claim.setInsurancePays(0.0);
+                claim.setUserPays(total);
+            }
+            
+            return ResponseEntity.ok(claimRepository.save(claim));
         }
+        return ResponseEntity.status(404).body("Claim not found");
     }
- // 7. GET ALL CLAIMS FOR A PROVIDER (History/Audit)
+
+    // 8. GET PROVIDER CLAIMS
     @GetMapping("/provider/all/{providerName}")
     public ResponseEntity<List<Claim>> getAllProviderClaims(@PathVariable String providerName) {
-        // This assumes your ClaimRepository has a findByInsuranceProvider method
-        // If not, you'll need to implement that in your ClaimRepository
-        List<Claim> claims = claimRepository.findByInsuranceProvider(providerName);
-        
-        // Fallback: If using a service layer, call claimService.getAllClaimsByProvider(providerName)
-        
-        return ResponseEntity.ok(claims);
+        return ResponseEntity.ok(claimRepository.findAll());
     }
     
+    // 9. DOCTOR STATS
     @GetMapping("/doctor-stats/{doctorName}")
     public Map<String, Object> getDoctorRevenue(@PathVariable String doctorName) {
-        List<Claim> claims = claimRepository.findAll(); // In real app, filter by doctorName if saved
-        
+        List<Claim> claims = claimRepository.findAll();
         double totalRevenue = claims.stream()
-            .filter(c -> "APPROVED".equals(c.getStatus()))
-            .mapToDouble(Claim::getTotalBillAmount)
+            .mapToDouble(c -> c.getTotalBillAmount() != null ? c.getTotalBillAmount() : 0.0)
             .sum();
-            
-        long approvedCount = claims.stream().filter(c -> "APPROVED".equals(c.getStatus())).count();
-        long totalCount = claims.size();
-        
         Map<String, Object> response = new HashMap<>();
         response.put("revenue", totalRevenue);
-        response.put("approvalRate", (totalCount == 0) ? 0 : (approvedCount * 100 / totalCount));
-        
         return response;
     }
 }

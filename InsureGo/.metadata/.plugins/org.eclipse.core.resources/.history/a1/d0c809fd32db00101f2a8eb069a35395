@@ -1,0 +1,30 @@
+package com.example.demo.config; // ⚠️ Make sure package name matches your service!
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable()) 
+            
+            // ⚠️ CRITICAL FIX: Disable CORS in individual services.
+            // The API Gateway handles CORS for the entire system.
+            // If we enable it here, the browser sees "Double Headers" and crashes.
+            .cors(cors -> cors.disable()) 
+            
+            .authorizeHttpRequests(auth -> auth
+                // Allow the Gateway to access these endpoints
+                .requestMatchers("/**").permitAll() 
+            );
+        
+        return http.build();
+    }
+}

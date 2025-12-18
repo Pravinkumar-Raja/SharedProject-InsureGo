@@ -1,0 +1,66 @@
+package com.example.demo.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer; // Needed for withDefaults()
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.cors.CorsConfiguration; // Critical Import
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource; // Critical Import
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+    
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // 1. Disable CSRF (React needs this disabled for POST requests)
+            .csrf(csrf -> csrf.disable())
+            
+            // 2. Enable CORS using the Bean below
+            .cors(Customizer.withDefaults()) 
+            
+            .authorizeHttpRequests(auth -> auth
+                // Allow these paths without login
+                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/user/name/**").permitAll()
+                // Lock everything else
+                .anyRequest().authenticated() 
+            );
+        
+        return http.build();
+    }
+
+    // ⚠️ THIS BEAN FIXES YOUR NETWORK ERROR ⚠️
+    @Bean
+    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // Allow your React Frontend
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
+        
+        // Allow GET, POST, PUT, DELETE
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // Allow Authorization headers (Bearer Token)
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        
+        // Allow credentials
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration); // Apply to entire app
+        return source;
+    }
+}

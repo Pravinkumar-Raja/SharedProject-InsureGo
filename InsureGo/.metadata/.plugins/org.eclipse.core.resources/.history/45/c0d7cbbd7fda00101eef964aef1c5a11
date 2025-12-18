@@ -1,0 +1,77 @@
+package com.example.demo.bean;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name="card") // Ensure this matches your actual DB table name
+public class InsuranceCard {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private Long userId;           
+    private String policyNumber;
+    private String policyName;
+    private String insuranceProvider; // Use this instead of 'provider' to match service
+    
+    // --- NEW FIELDS ADDED TO FIX ERRORS ---
+    private Double coverageAmount; 
+    private LocalDate issueDate;    
+    // --------------------------------------
+
+    private LocalDate expiryDate;
+    private String patientName;
+    private String fileUri;        
+    private LocalDateTime uploadedAt = LocalDateTime.now();
+
+    // Changed to String to allow "ACTIVE" status from service
+    private String status = "PENDING"; 
+
+    // Default Constructor
+    public InsuranceCard() {}
+
+    // --- GETTERS AND SETTERS ---
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getPolicyNumber() { return policyNumber; }
+    public void setPolicyNumber(String policyNumber) { this.policyNumber = policyNumber; }
+
+    public String getPolicyName() { return policyName; }
+    public void setPolicyName(String policyName) { this.policyName = policyName; }
+
+    public String getInsuranceProvider() { return insuranceProvider; }
+    public void setInsuranceProvider(String insuranceProvider) { this.insuranceProvider = insuranceProvider; }
+    
+    // Legacy getter if your code uses getProvider() elsewhere, map it to insuranceProvider
+    public String getProvider() { return insuranceProvider; }
+    public void setProvider(String provider) { this.insuranceProvider = provider; }
+
+    public Double getCoverageAmount() { return coverageAmount; }
+    public void setCoverageAmount(Double coverageAmount) { this.coverageAmount = coverageAmount; }
+
+    public LocalDate getIssueDate() { return issueDate; }
+    public void setIssueDate(LocalDate issueDate) { this.issueDate = issueDate; }
+
+    public LocalDate getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
+
+    public String getPatientName() { return patientName; }
+    public void setPatientName(String patientName) { this.patientName = patientName; }
+
+    public String getFileUri() { return fileUri; }
+    public void setFileUri(String fileUri) { this.fileUri = fileUri; }
+
+    public LocalDateTime getUploadedAt() { return uploadedAt; }
+    public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+}

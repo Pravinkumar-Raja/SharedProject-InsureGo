@@ -13,7 +13,9 @@ public class Claim {
 
     private Long userId;        
     private String policyNo;    
-    
+    @Column(name = "doctor_id")
+    private Long doctorId;
+    private String doctorName;
     // Filled by Doctor
     private String treatmentDescription; 
     private Double totalBillAmount;      
@@ -48,8 +50,21 @@ public class Claim {
     public String getMedicalDocumentPath() { return medicalDocumentPath; }
     public void setMedicalDocumentPath(String path) { this.medicalDocumentPath = path; }
     public Claim() {}
-
-    // --- Getters and Setters ---
+    
+    public Long getDoctorId() {
+		return doctorId;
+	}
+	public void setDoctorId(Long doctorId) {
+		this.doctorId = doctorId;
+	}
+	
+	public String getDoctorName() {
+		return doctorName;
+	}
+	public void setDoctorName(String doctorName) {
+		this.doctorName = doctorName;
+	}
+	// --- Getters and Setters ---
     public Long getClaimId() { return claimId; }
     public void setClaimId(Long claimId) { this.claimId = claimId; }
 

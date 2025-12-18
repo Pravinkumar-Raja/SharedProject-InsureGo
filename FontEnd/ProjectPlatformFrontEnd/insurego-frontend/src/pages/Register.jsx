@@ -1,169 +1,239 @@
 import React, { useState } from 'react';
-import { Container, Card, Form, Button, Alert, Modal, InputGroup } from 'react-bootstrap';
-import { useNavigate ,Link} from 'react-router-dom';
-import api from '../services/api'; 
+import { useNavigate, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, Button, Spinner, Alert, InputGroup } from 'react-bootstrap';
+import { User, Mail, Lock, Phone, Shield, ArrowRight, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import api from '../services/api'; // Ensure this points to your API service
 
 const Register = () => {
     const navigate = useNavigate();
-
-    const [formData, setFormData] = useState({ 
-        name: '', 
-        email: '', 
-        phoneNumber: '', 
-        password: '', 
-        role: 'PATIENT' // Default Role
+    
+    // State Management
+    const [formData, setFormData] = useState({
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        phoneNumber: '',
+        role: 'PATIENT' // Default role
     });
-
-    const [showOtpModal, setShowOtpModal] = useState(false);
-    const [otp, setOtp] = useState('');
-    const [error, setError] = useState('');
+    
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
 
-    // --- HANDLER 1: SUBMIT FORM -> REQUEST OTP ---
-    const handleInitialSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        try {
-            if (formData.phoneNumber.length < 10) throw new Error("Invalid Phone Number");
-
-            // This now calls the correct endpoint /auth/register/request-phone-otp via api.requestOtp
-            await api.requestOtp({ phoneNumber: formData.phoneNumber });
-
-            setLoading(false);
-            setShowOtpModal(true);
-            alert(`OTP Sent to ${formData.phoneNumber}. (Check Java Console)`);
-
-        } catch (err) {
-            setLoading(false);
-            console.error(err);
-            setError("Failed to send OTP. Check if phone is valid and Auth Service is running.");
-        }
-    };
-
-    // --- HANDLER 2: VERIFY OTP -> COMPLETE REGISTRATION ---
-    const handleVerifyAndRegister = async () => {
-        try {
-            // This now calls the correct endpoint /auth/register/verify-phone-otp via api.verifyOtp
-            await api.verifyOtp({
-                identifier: formData.phoneNumber,
-                code: otp
-            });
-
-            // If verification is successful, proceed to final registration
-            await api.register(formData);
-
-            alert("Registration Successful! Please Login.");
-            navigate('/login');
-
-        } catch (err) {
-            console.error(err);
-            alert("Invalid OTP or Registration Failed.");
-        }
-    };
-
+    // Handle Input Change
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+        // Clear error when user types
+        if (error) setError('');
+    };
+
+    // Handle Form Submit
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+
+        // 1. Validation Logic
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match.");
+            setLoading(false);
+            return;
+        }
+        if (formData.password.length < 6) {
+            setError("Password must be at least 6 characters.");
+            setLoading(false);
+            return;
+        }
+
+        // 2. Prepare Payload (Exclude confirmPassword)
+        const payload = {
+            username: formData.username,
+            email: formData.email,
+            password: formData.password,
+            phoneNumber: formData.phoneNumber,
+            role: formData.role
+        };
+
+        // 3. API Connection
+        try {
+            // Assuming api.register performs a POST to /auth/register
+            await api.register(payload); 
+            setSuccess(true);
+            
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                navigate('/login');
+            }, 2000);
+        } catch (err) {
+            console.error(err);
+            // Handle backend error messages
+            const msg = err.response?.data?.message || "Registration failed. Try a different email.";
+            setError(msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- 🎨 STYLES ---
+    const bgStyle = {
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+    };
+
+    const glassCardStyle = {
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255, 255, 255, 0.5)',
+        borderRadius: '24px',
+        overflow: 'hidden',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
+    };
+
+    const sidePanelStyle = {
+        background: 'linear-gradient(135deg, #0d6efd 0%, #0099ff 100%)',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '3rem',
+        height: '100%'
     };
 
     return (
-        <Container className="d-flex justify-content-center align-items-center mt-5">
-            <Card className="shadow p-4" style={{ width: '450px' }}>
-                <h3 className="text-center mb-3">Create Account</h3>
-                {error && <Alert variant="danger">{error}</Alert>}
+        <div style={bgStyle}>
+            <Container>
+                <Row className="justify-content-center">
+                    <Col lg={10}>
+                        <Card style={glassCardStyle} className="border-0">
+                            <Row className="g-0">
+                                {/* Left Side: Visuals */}
+                                <Col md={5} className="d-none d-md-block">
+                                    <div style={sidePanelStyle}>
+                                        <div className="mb-4">
+                                            <div className="bg-white p-3 rounded-circle d-inline-flex mb-3 shadow-sm">
+                                                <Shield size={32} className="text-primary" />
+                                            </div>
+                                            <h2 className="fw-bold display-6">InsureGo</h2>
+                                            <p className="lead opacity-75">Your Health, Secured.</p>
+                                        </div>
+                                        <div className="mt-auto">
+                                            <div className="d-flex align-items-center gap-3 mb-3">
+                                                <CheckCircle size={20} className="text-white" /> 
+                                                <span>Instant Policy Approval</span>
+                                            </div>
+                                            <div className="d-flex align-items-center gap-3 mb-3">
+                                                <CheckCircle size={20} className="text-white" /> 
+                                                <span>Top-tier Medical Network</span>
+                                            </div>
+                                            <div className="d-flex align-items-center gap-3">
+                                                <CheckCircle size={20} className="text-white" /> 
+                                                <span>24/7 Claim Support</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Col>
 
-                <Form onSubmit={handleInitialSubmit}>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Full Name</Form.Label>
-                        <Form.Control 
-                            required 
-                            placeholder="John Doe"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                        />
-                    </Form.Group>
+                                {/* Right Side: Form */}
+                                <Col md={7}>
+                                    <Card.Body className="p-5">
+                                        <div className="mb-4">
+                                            <h3 className="fw-bold text-dark">Create Account</h3>
+                                            <p className="text-muted">Join thousands of secured users today.</p>
+                                        </div>
 
-                    <Form.Group className="mb-3">
-                        <Form.Label>Email Address</Form.Label>
-                        <Form.Control 
-                            type="email" required 
-                            placeholder="john@example.com"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                        />
-                    </Form.Group>
+                                        {error && <Alert variant="danger" className="d-flex align-items-center gap-2"><div className="fw-bold">Error:</div> {error}</Alert>}
+                                        {success && <Alert variant="success" className="d-flex align-items-center gap-2"><CheckCircle size={18}/> Registration successful! Redirecting...</Alert>}
 
-                    <Form.Group className="mb-3">
-                        <Form.Label>Phone Number</Form.Label>
-                        <InputGroup>
-                            <InputGroup.Text>+91</InputGroup.Text>
-                            <Form.Control 
-                                required 
-                                placeholder="9876543210"
-                                name="phoneNumber"
-                                value={formData.phoneNumber}
-                                onChange={handleChange}
-                            />
-                        </InputGroup>
-                    </Form.Group>
+                                        <Form onSubmit={handleRegister}>
+                                            <Row>
+                                                <Col md={12} className="mb-3">
+                                                    <Form.Label className="small fw-bold text-muted">FULL NAME</Form.Label>
+                                                    <InputGroup>
+                                                        <InputGroup.Text className="bg-light border-end-0"><User size={18} className="text-muted"/></InputGroup.Text>
+                                                        <Form.Control name="username" type="text" placeholder="e.g. John Doe" className="bg-light border-start-0" required value={formData.username} onChange={handleChange} />
+                                                    </InputGroup>
+                                                </Col>
+                                            </Row>
 
-                    <Form.Group className="mb-3">
-                        <Form.Label>I am a...</Form.Label>
-                        <Form.Select 
-                            name="role"
-                            value={formData.role}
-                            onChange={handleChange}
-                        >
-                            <option value="PATIENT">Patient (User)</option>
-                            <option value="DOCTOR">Doctor</option>
-                            <option value="PROVIDER">Insurance Provider</option>
-                        </Form.Select>
-                    </Form.Group>
+                                            <Row>
+                                                <Col md={6} className="mb-3">
+                                                    <Form.Label className="small fw-bold text-muted">EMAIL</Form.Label>
+                                                    <InputGroup>
+                                                        <InputGroup.Text className="bg-light border-end-0"><Mail size={18} className="text-muted"/></InputGroup.Text>
+                                                        <Form.Control name="email" type="email" placeholder="name@example.com" className="bg-light border-start-0" required value={formData.email} onChange={handleChange} />
+                                                    </InputGroup>
+                                                </Col>
+                                                <Col md={6} className="mb-3">
+                                                    <Form.Label className="small fw-bold text-muted">PHONE</Form.Label>
+                                                    <InputGroup>
+                                                        <InputGroup.Text className="bg-light border-end-0"><Phone size={18} className="text-muted"/></InputGroup.Text>
+                                                        <Form.Control name="phoneNumber" type="tel" placeholder="+1 234 567" className="bg-light border-start-0" required value={formData.phoneNumber} onChange={handleChange} />
+                                                    </InputGroup>
+                                                </Col>
+                                            </Row>
 
-                    <Form.Group className="mb-3">
-                        <Form.Label>Password</Form.Label>
-                        <Form.Control 
-                            type="password" required 
-                            placeholder="******"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleChange}
-                        />
-                    </Form.Group>
+                                            <Row>
+                                                <Col md={6} className="mb-3">
+                                                    <Form.Label className="small fw-bold text-muted">PASSWORD</Form.Label>
+                                                    <InputGroup>
+                                                        <InputGroup.Text className="bg-light border-end-0"><Lock size={18} className="text-muted"/></InputGroup.Text>
+                                                        <Form.Control name="password" type={showPassword ? "text" : "password"} placeholder="••••••" className="bg-light border-start-0 border-end-0" required value={formData.password} onChange={handleChange} />
+                                                        <InputGroup.Text className="bg-light border-start-0 cursor-pointer" onClick={() => setShowPassword(!showPassword)} style={{cursor: 'pointer'}}>
+                                                            {showPassword ? <EyeOff size={18} className="text-muted"/> : <Eye size={18} className="text-muted"/>}
+                                                        </InputGroup.Text>
+                                                    </InputGroup>
+                                                </Col>
+                                                <Col md={6} className="mb-3">
+                                                    <Form.Label className="small fw-bold text-muted">CONFIRM</Form.Label>
+                                                    <InputGroup>
+                                                        <InputGroup.Text className="bg-light border-end-0"><Lock size={18} className="text-muted"/></InputGroup.Text>
+                                                        <Form.Control name="confirmPassword" type="password" placeholder="••••••" className="bg-light border-start-0" required value={formData.confirmPassword} onChange={handleChange} />
+                                                    </InputGroup>
+                                                </Col>
+                                            </Row>
 
-                    <Button type="submit" className="w-100" variant="primary" disabled={loading}>
-                        {loading ? "Sending OTP..." : "Verify & Register"}
-                    </Button>
-                </Form>
+                                            <div className="mb-4">
+                                                <Form.Label className="small fw-bold text-muted">I AM A...</Form.Label>
+                                                <div className="d-flex gap-2">
+                                                    {['PATIENT', 'DOCTOR', 'PROVIDER'].map((role) => (
+                                                        <Button 
+                                                            key={role}
+                                                            variant={formData.role === role ? 'primary' : 'outline-light'}
+                                                            className={`flex-grow-1 ${formData.role === role ? '' : 'text-dark border-secondary-subtle'}`}
+                                                            onClick={() => setFormData({...formData, role: role})}
+                                                        >
+                                                            {role.charAt(0) + role.slice(1).toLowerCase()}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
 
-                <div className="text-center mt-3">
-                    <small>Already have an account? <Link to="/login">Login</Link></small>
-                </div>
-            </Card>
+                                            <Button variant="primary" type="submit" className="w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2" disabled={loading}>
+                                                {loading ? <Spinner size="sm" animation="border" /> : (
+                                                    <>Create Account <ArrowRight size={18}/></>
+                                                )}
+                                            </Button>
 
-            {/* OTP MODAL */}
-            <Modal show={showOtpModal} onHide={() => setShowOtpModal(false)} centered>
-                <Modal.Header closeButton><Modal.Title>Verify Phone Number</Modal.Title></Modal.Header>
-                <Modal.Body>
-                    <p>Enter the 6-digit code sent to <strong>+91 {formData.phoneNumber}</strong></p>
-                    <Form.Control 
-                        className="text-center text-primary fw-bold fs-4"
-                        placeholder="000000"
-                        maxLength={6}
-                        value={otp}
-                        onChange={e => setOtp(e.target.value)}
-                    />
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowOtpModal(false)}>Cancel</Button>
-                    <Button variant="success" onClick={handleVerifyAndRegister}>Confirm OTP</Button>
-                </Modal.Footer>
-            </Modal>
-        </Container>
+                                            <div className="text-center mt-4">
+                                                <p className="text-muted small">
+                                                    Already have an account? <Link to="/login" className="text-primary fw-bold text-decoration-none">Sign In</Link>
+                                                </p>
+                                            </div>
+                                        </Form>
+                                    </Card.Body>
+                                </Col>
+                            </Row>
+                        </Card>
+                    </Col>
+                </Row>
+            </Container>
+        </div>
     );
 };
 
