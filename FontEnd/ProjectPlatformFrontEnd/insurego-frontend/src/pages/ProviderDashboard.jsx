@@ -55,7 +55,7 @@ const ProviderDashboard = () => {
     const [editingPlanId, setEditingPlanId] = useState(null); 
     const [newPolicyForm, setNewPolicyForm] = useState({ policyName: '', coverageAmount: '', premium: '', benefits: '', provider: storedProviderName });
     
-    // 🟢 UPDATED: Action Modal State
+    // Action Modal State
     const [showActionModal, setShowActionModal] = useState(false);
     const [selectedClaim, setSelectedClaim] = useState(null);
     const [actionNotes, setActionNotes] = useState('');
@@ -142,7 +142,7 @@ const ProviderDashboard = () => {
     const handleEditPlan = (plan) => { setEditingPlanId(plan.id); setNewPolicyForm({ policyName: plan.policyName, coverageAmount: plan.coverageAmount, premium: plan.premium, benefits: plan.benefits, provider: storedProviderName }); setShowPolicyModal(true); };
     const handleDeletePlan = async (id) => { if(!window.confirm("Delete?")) return; try { await api.deleteMarketplacePlan(id); loadDashboardData(); } catch (e) { alert("Failed."); } };
 
-    // 🟢 Claim Action Submit
+    // Claim Action Submit
     const handleSubmitClaimAction = async () => { 
         try { 
             await api.processClaimAction(selectedClaim.claimId, actionStatus, { notes: actionNotes, reviewedBy: storedProviderName }); 
@@ -150,7 +150,7 @@ const ProviderDashboard = () => {
         } catch (e) { alert("Processing failed."); } 
     };
 
-    // 🟢 OPEN DOCUMENT MODAL
+    // OPEN DOCUMENT MODAL
     const openReviewModal = (claim) => {
         setSelectedClaim(claim);
         setActionStatus(''); // Reset status
@@ -254,7 +254,7 @@ const ProviderDashboard = () => {
                 </Row>
             </Container>
             
-            {/* 🟢 NEW: Detailed Claim Review Modal (Acts as the Document Viewer) */}
+            {/* Detailed Claim Review Modal */}
             <Modal show={showActionModal} onHide={() => setShowActionModal(false)} size="lg" centered>
                 <Modal.Header closeButton style={{background: '#f8f9fa'}}>
                     <Modal.Title className="fw-bold text-primary"><FileCheck size={24} className="me-2"/>Claim Review Document</Modal.Title>
@@ -305,7 +305,7 @@ const ProviderDashboard = () => {
                 </Modal.Footer>
             </Modal>
 
-            {/* Policy Modal */}
+            {/* 🟢 FIXED: Policy Modal with Benefits Field Restored */}
             <Modal show={showPolicyModal} onHide={resetPolicyForm} centered>
                 <Modal.Header closeButton><Modal.Title>{editingPlanId ? "Edit Plan" : "New Plan"}</Modal.Title></Modal.Header>
                 <Modal.Body>
@@ -315,6 +315,11 @@ const ProviderDashboard = () => {
                             <Col><Form.Control type="number" placeholder="Coverage" required value={newPolicyForm.coverageAmount} onChange={e => setNewPolicyForm({...newPolicyForm, coverageAmount: e.target.value})}/></Col>
                             <Col><Form.Control type="number" placeholder="Premium" required value={newPolicyForm.premium} onChange={e => setNewPolicyForm({...newPolicyForm, premium: e.target.value})}/></Col>
                         </Row>
+                        {/* 🟢 ADDED: Missing Benefits Field */}
+                        <Form.Group className="mt-3">
+                            <Form.Label>Benefits (comma separated)</Form.Label>
+                            <Form.Control as="textarea" rows={2} placeholder="e.g. Dental, Vision, No Copay" value={newPolicyForm.benefits} onChange={e => setNewPolicyForm({...newPolicyForm, benefits: e.target.value})} />
+                        </Form.Group>
                         <Button variant="primary" type="submit" className="w-100 mt-3">Save Plan</Button>
                     </Form>
                 </Modal.Body>
